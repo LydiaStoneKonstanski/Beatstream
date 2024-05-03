@@ -40,3 +40,5 @@ engine = create_engine(f'mysql://{user}:{password}@{host}/beatstream')
 Base.metadata.create_all(engine)
 
 session = Session(bind=engine)
+
+#This is a test.

@@ -40,7 +40,7 @@ class CurrentSongConsumer:
            userID=message['userID'],
            modelID=1,
            songID=random.randint(1,1000),
-            model_score=random.randint(1,100)
+           model_score=random.randint(1,100)
        )
        session.add(r)
 
@@ -51,6 +51,8 @@ class CurrentSongConsumer:
            songID=random.randint(1, 1000),
            model_score=random.randint(1, 100)
        )
+       session.add(r)
+
        r = Recommendation(
            userID=message['userID'],
            modelID=3,

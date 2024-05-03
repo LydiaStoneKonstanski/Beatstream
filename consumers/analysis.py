@@ -9,11 +9,11 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
-    current_song = (String(250))
+    current_song = Column(String(250))
 
     def __init__(self, id, current_song):
         self.id = id
-        self.current_song = current_song
+        self.current_song = str(current_song)
 
 class Recommendation(Base):
     __tablename__ = 'recommendations'

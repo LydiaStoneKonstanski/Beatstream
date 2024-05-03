@@ -6,10 +6,10 @@ conn = sqlite3.connect(db_path)
 
 cursor = conn.cursor()
 
-cursor.execute("SELECT * FROM users LIMIT 10")
+cursor.execute("SELECT id, current_song FROM users LIMIT 10")
 print(cursor.fetchall())
 
-cursor.execute("SELECT * FROM recommendations LIMIT 10")
+cursor.execute("SELECT * FROM recommendations ORDER BY id DESC LIMIT 10")
 print(cursor.fetchall())
 
 conn.close()

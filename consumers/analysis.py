@@ -1,10 +1,15 @@
+import sqlalchemy
 from sqlalchemy import Column, Integer, String, DECIMAL, create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 import os
 
-Base = declarative_base()
+host = os.environ["host"]
+user = os.environ["user"]
+password = os.environ["password"]
+
+Base = sqlalchemy.orm.declarative_base()
 
 class User(Base):
     __tablename__ = 'users'
@@ -29,8 +34,9 @@ class Recommendation(Base):
         self.songID = songID
         self.model_score = model_score
 
-db_path = os.path.realpath('../data/beatstream.sqlite')
-engine = create_engine(f'sqlite:///{db_path}')
+
+# db_path = os.path.realpath('../data/beatstream.sqlite')
+engine = create_engine(f'mysql://{user}:{password}@{host}/beatstream')
 Base.metadata.create_all(engine)
 
 session = Session(bind=engine)

@@ -43,29 +43,29 @@ class Analysis(Base):
 
 class ArtistMbtag(Base):
     __tablename__ = 'artist_mbtag'
-    #  Required for sqlalchemy even though table does not have primary key column
     index = Column(Integer, primary_key=True)
     artist_id = Column(String(25))
     mbtag = Column(String(250))
 
-    def __init__(self, artist_id, mbtag):
+    def __init__(self, index, artist_id, mbtag):
+        self.index = index
         self.artist_id = artist_id
         self.mbtag = mbtag
 
 
-class Artist(Base):
-    __tablename__ = 'artists'
-    #  Required for sqlalchemy even though table does not have primary key column
-    index = Column(Integer, primary_key=True)
-    artist_id = Column(String(25))
-    mb_tag = Column(String(250))
-
-    def __init__(self, artist_id, mb_tag):
-        self.artist_id = artist_id
-        self.mb_tag = mb_tag
-
 class ArtistTerm(Base):
     __tablename__ = 'artist_term'
+    index = Column(Integer, primary_key=True)
+    artist_id = Column(String(25))
+    term = Column(String(250))
+
+    def __init__(self, index, artist_id, term):
+        self.index = index
+        self.artist_id = artist_id
+        self.term = term
+
+class Artist(Base):
+    __tablename__ = 'artists'
     artist_id = Column(String(25), primary_key=True)
 
     def __init__(self, artist_id):
@@ -73,12 +73,12 @@ class ArtistTerm(Base):
 
 class Similarity(Base):
     __tablename__ = 'similarity'
-    #  Required for sqlalchemy even though table does not have primary key column
     index = Column(Integer, primary_key=True)
     target = Column(String(25))
     similar = Column(String(25))
 
-    def __init__(self, target, similar):
+    def __init__(self, index, target, similar):
+        self.index = index
         self.target = target
         self.similar = similar
 """
@@ -92,7 +92,6 @@ artist_mbid TEXT\n)',)
 """
 class Track(Base):
     __tablename__ = 'tracks'
-    #  Required for sqlalchemy even though table does not have primary key column
     index = Column(Integer, primary_key=True)
     track_id = Column(String(25))
     title = Column(String(300))
@@ -114,11 +113,12 @@ class Track(Base):
     artist_mbid = Column(String(40))
 
 
-    def __init__(self, track_id, title, artist_name, release, year, duration,
+    def __init__(self, index, track_id, title, artist_name, release, year, duration,
                  song_hotttnesss, artist_hotttnesss, artist_familiarity,
                  artist_location, artist_latitude, artist_longitude,
                  song_id, artist_id, track_7digitalid, artist_7digitalid,
                  release_7digitalid, artist_mbid):
+        self.index = index
         self.track_id = track_id
         self.title = title
         self.artist_name = artist_name
@@ -152,6 +152,8 @@ class MillionConnection():
         Base.metadata.create_all(self.engine)
         self.session = Session(bind=self.engine)
 
-m = MillionConnection()
-s = m.session
+
+if __name__ == "__main__":
+    m = MillionConnection()
+    s = m.session
 

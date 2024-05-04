@@ -63,4 +63,6 @@ class CurrentSongConsumer:
         self.beat_session.commit()
 
 
-
+if __name__ == "__main__":
+    c = CurrentSongConsumer()
+    c.handleMessages()

@@ -45,3 +45,6 @@ class BeatstreamConnection():
         self.session = Session(bind=self.engine)
 
 
+if __name__ == "__main__":
+    b = BeatstreamConnection()
+    s = b.session

@@ -24,9 +24,13 @@ new_topic = Topic('listen-events', 9092)
 
 spark = SparkSession.builder \
     .appName("beat_streamer") \
-    .config("spark.executor.memory", "4g") \
-    .config("spark.executor.cores", "4") \
-    .config("spark.sql.shuffle.partitions", "100") \
+    .config("spark.executor.memory", "2g") \
+    .config("spark.driver.memory", '1g') \
+    .config("spark.executor.cores", "2") \
+    .config("spark.sql.shuffle.partitions", "200") \
+    .config("spark.dynamicAllocation.enabled", "true") \
+    .config("spark.dynamicAllocation.minExecutors", "1") \
+    .config("spark.dynamicAllocation.maxExecutors", "20") \
     .getOrCreate()
 
 # this is the spark equivalent of a consumer
@@ -36,6 +40,7 @@ df = spark \
     .format("kafka") \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", f"{new_topic.topic}") \
+    .option("startingOffsets", "earliest") \
     .option("maxOffsetsPerTrigger", 20000) \
     .load()
 df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
@@ -61,32 +66,37 @@ parsed_df = df.withColumn("data", from_json(col("value"), schema))
 parsed_df.createOrReplaceTempView("Hits")
 
 # Use SQL to format the timestamp and create a new DataFrame
-formatted_df = spark.sql("""
-    SELECT data.song song, 
-    count(data.song) song_count, 
-    from_unixtime(data.ts / 1000, 'yyyy-MM-dd HH:mm:ss') timestamp
-    FROM Hits
-    GROUP BY song , timestamp
-    ORDER BY count(data.song)
-""")
-
 # try counting the number of times an artist/song appears in the listen-events
-song_plays = parsed_df.select(
-    col('data.ts').alias('time'),
-    col("data.song").alias("song")
-).groupBy("song").count() \
-    .orderBy(col('count') \
-    .desc()).limit(10)
 
-artist_listens = parsed_df.select(
-    col("data.artist").alias("artist")
-).groupBy("artist").count()
 
-# how many users in each city?
-
-users_in_city = parsed_df.select(
-    col("data.city").alias("city")
-).groupBy("city").count()
+formatted_df = spark.sql("""
+    SELECT 
+    data.song AS song, 
+    COUNT(data.song) AS song_count, 
+    MAX(DATE(FROM_UNIXTIME(data.ts / 1000))) AS last_played_date
+    FROM Hits
+    GROUP BY data.song
+    ORDER BY song_count DESC
+    LIMIT 10
+""")
+#
+#
+# song_plays = parsed_df.select(
+#     col('data.ts').alias('time'),
+#     col("data.song").alias("song")
+# ).groupBy("song").count() \
+#     .orderBy(col('count') \
+#     .desc()).limit(10)
+#
+# artist_listens = parsed_df.select(
+#     col("data.artist").alias("artist")
+# ).groupBy("artist").count()
+#
+# # how many users in each city?
+#
+# users_in_city = parsed_df.select(
+#     col("data.city").alias("city")
+# ).groupBy("city").count()
 
 # use spark to create a new DataFrame from the kafka message
 # set the log level to avoid getting too many info-level logs every for every execution.

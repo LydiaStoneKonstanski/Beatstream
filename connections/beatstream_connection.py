@@ -21,13 +21,13 @@ class Recommendation(Base):
     id = Column(Integer, primary_key=True)
     userID = Column(Integer)
     modelID = Column(Integer)
-    songID = Column(String(250))
+    trackID = Column(String(250))
     model_score = Column(DECIMAL)
 
-    def __init__(self, userID, modelID, songID, model_score):
+    def __init__(self, userID, modelID, trackID, model_score):
         self.userID = userID
         self.modelID = modelID
-        self.songID = songID
+        self.trackID = trackID
         self.model_score = model_score
 
 class BeatstreamConnection():
@@ -44,7 +44,18 @@ class BeatstreamConnection():
         Base.metadata.create_all(self.engine)
         self.session = Session(bind=self.engine)
 
+    def reset_database(self):
+        self.session.query(User).delete()
+        print ("Deleted all records from users table")
+        self.session.query(Recommendation).delete()
+        print("Deleted all records from recommendations table")
+
+        self.session.commit()
+
 
 if __name__ == "__main__":
     b = BeatstreamConnection()
     s = b.session
+
+    # Uncomment this and run to reset the database:
+    #b.reset_database()

@@ -27,7 +27,7 @@ class CurrentSongConsumer:
     def updateUser(self, message):
         u = User(
             id=message['userID'],
-            current_song=str(message['songID'])
+            current_song=str(message['trackID'])
         )
         self.beat_session.merge(u)
 
@@ -40,7 +40,7 @@ class CurrentSongConsumer:
         r = Recommendation(
             userID=message['userID'],
             modelID=1,
-            songID=random.randint(1, 1000),
+            trackID=random.randint(1, 1000),
             model_score=random.randint(1, 100)
         )
         self.beat_session.add(r)
@@ -48,7 +48,7 @@ class CurrentSongConsumer:
         r = Recommendation(
             userID=message['userID'],
             modelID=2,
-            songID=random.randint(1, 1000),
+            trackID=random.randint(1, 1000),
             model_score=random.randint(1, 100)
         )
         self.beat_session.add(r)
@@ -56,7 +56,7 @@ class CurrentSongConsumer:
         r = Recommendation(
             userID=message['userID'],
             modelID=3,
-            songID=random.randint(1, 1000),
+            trackID=random.randint(1, 1000),
             model_score=random.randint(1, 100)
         )
         self.beat_session.add(r)

@@ -1,0 +1,52 @@
+Used Jupyter to export SQLite to CSV:
+
+import sqlite3
+import pandas as pd
+db_path = '/Users/lydia/Projects/Beatstream things/million_song_database.sqlite'
+conn = sqlite3.connect(db_path)
+cur = conn.cursor()
+
+analysis_df = pd.read_sql_query("SELECT * FROM analysis", conn)
+artist_mbtag_df = pd.read_sql_query("SELECT * FROM artist_mbtag", conn)
+artist_term_df = pd.read_sql_query("SELECT * FROM artist_term", conn)
+artists_df = pd.read_sql_query("SELECT * FROM artists", conn)
+similarity_df = pd.read_sql_query("SELECT * FROM similarity", conn)
+tracks_df = pd.read_sql_query("SELECT * FROM tracks", conn)
+
+
+# Need to set index = False where the sqlite table has a primary key, otherwise there's an extra column in the csv
+
+analysis_df.to_csv(f'/Users/lydia/Projects/BSL/data/analysis.csv', index = False)
+artist_mbtag_df.to_csv(f'/Users/lydia/Projects/BSL/data/artist_mbtag.csv')
+artist_term_df.to_csv(f'/Users/lydia/Projects/BSL/data/artist_term.csv')
+artists_df.to_csv(f'/Users/lydia/Projects/BSL/data/artists.csv', index = False)
+similarity_df.to_csv(f'/Users/lydia/Projects/BSL/data/similarity.csv')
+tracks_df.to_csv(f'/Users/lydia/Projects/BSL/data/tracks.csv')
+
+
+Created million database in MySQL
+
+Created the tables in MySQL using the SQLAlchemy in Python (million_connection.py)
+
+
+
+Then loaded CSV to MySQL using Terminal.
+
+Note: Have to launch MySQL with permission to load local files:
+
+mysql --local-infile=1 -u lydia -p
+
+USE million
+
+
+LOAD DATA LOCAL INFILE '/Users/lydia/Projects/BSL/data/analysis.csv'  INTO TABLE analysis FIELDS TERMINATED BY ','  ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
+
+LOAD DATA LOCAL INFILE '/Users/lydia/Projects/BSL/data/artist_mbtag.csv'  INTO TABLE artist_mbtag FIELDS TERMINATED BY ','  ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
+
+LOAD DATA LOCAL INFILE '/Users/lydia/Projects/BSL/data/artist_term.csv'  INTO TABLE artist_term FIELDS TERMINATED BY ','  ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
+
+LOAD DATA LOCAL INFILE '/Users/lydia/Projects/BSL/data/artists.csv'  INTO TABLE artists FIELDS TERMINATED BY ','  ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
+
+LOAD DATA LOCAL INFILE '/Users/lydia/Projects/BSL/data/similarity.csv'  INTO TABLE similarity FIELDS TERMINATED BY ','  ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
+
+LOAD DATA LOCAL INFILE '/Users/lydia/Projects/BSL/data/tracks.csv'  INTO TABLE tracks FIELDS TERMINATED BY ','  ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;

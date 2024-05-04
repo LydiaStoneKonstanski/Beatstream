@@ -5,10 +5,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 import os
 
-host = os.environ["host"]
-user = os.environ["user"]
-password = os.environ["password"]
-
 Base = sqlalchemy.orm.declarative_base()
 
 class User(Base):
@@ -34,11 +30,18 @@ class Recommendation(Base):
         self.songID = songID
         self.model_score = model_score
 
+class BeatstreamConnection():
+    def __init__(self, local=True):
+        if local == True:
+            self.host = os.environ["host"]
+            self.user = os.environ["user"]
+            self.password = os.environ["password"]
+            self.engine = create_engine(f'mysql://{self.user}:{self.password}@{self.host}/beatstream')
+        else:
+            # TODO: set up remote connection
+            raise NotImplementedError
 
-# db_path = os.path.realpath('../data/beatstream.sqlite')
-engine = create_engine(f'mysql://{user}:{password}@{host}/beatstream')
-Base.metadata.create_all(engine)
+        Base.metadata.create_all(self.engine)
+        self.session = Session(bind=self.engine)
 
-session = Session(bind=engine)
 
-#This is a test.

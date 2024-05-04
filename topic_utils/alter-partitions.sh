@@ -1,0 +1,2 @@
+#note that you cannot remove partitions but you can add them with this so be careful!
+/opt/homebrew/opt/kafka/bin/kafka-topics --alter --bootstrap-server localhost:9092 --topic listen-activity --partitions 4

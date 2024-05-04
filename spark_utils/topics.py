@@ -13,12 +13,17 @@ class Topic:
 
     def j_produce(self):
         producer = KafkaProducer(bootstrap_servers=f'localhost:{self.port}',
-                                   value_serializer=lambda x: dumps(x).encode('utf-8'))
-        with open(self.file, 'r') as file:
+                                 value_serializer=lambda x: dumps(x).encode('utf-8'),
+                                 linger_ms=10)
+        with (open(self.file, 'r') as file):
             for line in file:
                 j_data = loads(line)
-                producer.send(topic=f'{self.topic}', value=j_data)
-                sleep(2)
+                producer.send(topic=self.topic, value=j_data)
+                sleep(.1)
+                # .add_callback('success') \ research these and find out how to use them properly
+                # .add_errback()
+                #add more informative responses to err and call bak functions, (metadata, offset, and so on)
+            producer.flush()  # ensures all messages are set before the close
             producer.close()
 
     def create(self, topic, port):

@@ -152,4 +152,6 @@ class MillionConnection():
         Base.metadata.create_all(self.engine)
         self.session = Session(bind=self.engine)
 
+m = MillionConnection()
+s = m.session
 

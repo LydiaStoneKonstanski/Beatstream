@@ -2,7 +2,7 @@ import sqlite3
 
 from kafka import KafkaConsumer
 from json import loads
-from connections.beatstream_connection import User, Recommendation, BeatstreamConnection
+from connections.beatstream_connection import BeatstreamConnection, User, Recommendation
 import random
 
 
@@ -63,6 +63,4 @@ class CurrentSongConsumer:
         self.beat_session.commit()
 
 
-if __name__ == "__main__":
-    c = CurrentSongConsumer()
-    c.handleMessages()
+

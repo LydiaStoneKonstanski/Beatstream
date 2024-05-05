@@ -31,7 +31,7 @@ class PredictiveModels():
         model_id = "Model C"
         year = self.million_connection.get_year(track_id)
         decade = self.million_connection.get_decade(year)
-        tracks = self.million_session.query(Track).filter(self.million_connection.get_decade(Track.year) == decade).all()
+        tracks = self.million_session.query(Track).filter(Track.year >= decade, Track.year < decade + 10).all()
         random_choice = random.randint(0, len(tracks))
         track = tracks[random_choice]
         return (model_id, track.track_id)

@@ -1,4 +1,6 @@
-import sqlite3
+
+import cProfile
+import pstats
 
 from kafka import KafkaConsumer
 from json import loads
@@ -54,6 +56,8 @@ class CurrentSongConsumer:
             self.scoreModels(message)
             self.recommendSong(message)
 
+            return
+
     '''Shows current song for user.'''
     def updateUser(self, message):
         u = User(
@@ -64,13 +68,13 @@ class CurrentSongConsumer:
 
         self.beat_session.commit()
 
-    def scoreModel(self, message):
+    def scoreModels(self, message):
         new_track_id = message['trackID']
         user_id = message['userID']
         recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
         for recommendation in recommendations:
             recommended_track_id = recommendation.trackID
-            score = self.score_mechanic(new_track_id, recommended_track_id)
+            score = self.score_mechanic.get_score(new_track_id, recommended_track_id)
             recommendation.model_score += score
             self.beat_session.add(recommendation)
         self.beat_session.commit()
@@ -110,8 +114,18 @@ class CurrentSongConsumer:
         self.beat_session.merge(recommendation)
 
 
+def main():
+    c = CurrentSongConsumer()
+    c.handleMessages()
 
 
 if __name__ == "__main__":
-    c = CurrentSongConsumer()
-    c.handleMessages()
+    #main()
+    #cProfile.run('main()')
+
+    with cProfile.Profile() as profile:
+        main()
+
+    profile_result = pstats.Stats(profile)
+    profile_result.sort_stats(pstats.SortKey.TIME)
+    profile_result.print_stats()

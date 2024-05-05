@@ -2,6 +2,7 @@ import sqlite3
 
 from kafka import KafkaConsumer
 from json import loads
+from connections.million_connection import MillionConnection, Track
 from connections.beatstream_connection import BeatstreamConnection, User, Recommendation
 import random
 
@@ -11,6 +12,8 @@ class CurrentSongConsumer:
     def __init__(self):
         self.beatstream_connection = BeatstreamConnection(local=True)
         self.beat_session = self.beatstream_connection.session
+        self.million_connection = MillionConnection(local=True)
+        self.million_session = self.million_connection.session
         self.consumer = KafkaConsumer(
             'user_current_song',
             bootstrap_servers=['localhost:9092'],
@@ -33,6 +36,13 @@ class CurrentSongConsumer:
 
         self.beat_session.commit()
 
+    def get_random_song(self):
+        index = random.randint(1, 1000000)
+        # query on table Track, filtering down to matching index, and because index is unique there
+        # should only be one result so we can take the first result of the query.
+        track = self.million_session.query(Track).filter(Track.index == index).first()
+        return track.track_id
+
     def recommendSong(self, message):
         # Delete previous recommendations for this user
         self.beat_session.query(Recommendation).filter(Recommendation.userID == message['userID']).delete()
@@ -40,7 +50,7 @@ class CurrentSongConsumer:
         r = Recommendation(
             userID=message['userID'],
             modelID=1,
-            trackID=random.randint(1, 1000),
+            trackID=self.get_random_song(),
             model_score=random.randint(1, 100)
         )
         self.beat_session.add(r)
@@ -48,7 +58,7 @@ class CurrentSongConsumer:
         r = Recommendation(
             userID=message['userID'],
             modelID=2,
-            trackID=random.randint(1, 1000),
+            trackID=self.get_random_song(),
             model_score=random.randint(1, 100)
         )
         self.beat_session.add(r)
@@ -56,7 +66,7 @@ class CurrentSongConsumer:
         r = Recommendation(
             userID=message['userID'],
             modelID=3,
-            trackID=random.randint(1, 1000),
+            trackID=self.get_random_song(),
             model_score=random.randint(1, 100)
         )
         self.beat_session.add(r)

@@ -5,6 +5,7 @@ from json import loads
 from connections.million_connection import MillionConnection, Track
 from connections.beatstream_connection import BeatstreamConnection, User, Recommendation
 import random
+from score_mechanic import ScoreMechanic
 
 ''' Interacts with  both databases.
 In total for consumers we need to establish a scoring system, and have a variety of models that use 
@@ -42,12 +43,14 @@ class CurrentSongConsumer:
             bootstrap_servers=['localhost:9092'],
             value_deserializer=lambda m: loads(m.decode('ascii'))
         )
+        self.score_mechanic = ScoreMechanic(self.million_connection)
     '''Currently updates user table and recommends a song using each predictive model'''
     def handleMessages(self):
         for message in self.consumer:
             message = message.value
             print('{} found'.format(message))
             self.updateUser(message)
+            self.scoreModels(message)
             self.recommendSong(message)
 
     '''Shows current song for user.'''
@@ -58,6 +61,17 @@ class CurrentSongConsumer:
         )
         self.beat_session.merge(u)
 
+        self.beat_session.commit()
+
+    def scoreModel(self, message):
+        new_track_id = message['trackID']
+        user_id = message['userID']
+        recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
+        for recommendation in recommendations:
+            recommended_track_id = recommendation.trackID
+            score = self.score_mechanic(new_track_id, recommended_track_id)
+            recommendation.model_score += score
+            self.beat_session.add(recommendation)
         self.beat_session.commit()
 
     '''Placeholder function. In future will have different functions for each predictive model.         
@@ -71,9 +85,14 @@ class CurrentSongConsumer:
     '''Recommend song adds one row per model for each user with recommended next song and total score for predictive model. 
     right now that score is a random placeholder.'''
     def recommendSong(self, message):
-        # Delete previous recommendations for this user
-        self.beat_session.query(Recommendation).filter(Recommendation.userID == message['userID']).delete()
-        # Add new recommendations
+        # TODO This function needs fixing once models are built
+        raise NotImplementedError
+        new_track_id = message['trackID']
+        user_id = message['userID']
+        recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
+
+
+
         r = Recommendation(
             userID=message['userID'],
             modelID=1,

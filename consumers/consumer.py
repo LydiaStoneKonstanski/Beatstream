@@ -4,8 +4,8 @@ from kafka import KafkaConsumer
 from json import loads
 from connections.million_connection import MillionConnection, Track
 from connections.beatstream_connection import BeatstreamConnection, User, Recommendation
-import random
 from score_mechanic import ScoreMechanic
+from predictive_models import PredictiveModels
 
 ''' Interacts with  both databases.
 In total for consumers we need to establish a scoring system, and have a variety of models that use 
@@ -44,6 +44,7 @@ class CurrentSongConsumer:
             value_deserializer=lambda m: loads(m.decode('ascii'))
         )
         self.score_mechanic = ScoreMechanic(self.million_connection)
+        self.predictive_models = PredictiveModels(self.million_connection)
     '''Currently updates user table and recommends a song using each predictive model'''
     def handleMessages(self):
         for message in self.consumer:
@@ -74,50 +75,41 @@ class CurrentSongConsumer:
             self.beat_session.add(recommendation)
         self.beat_session.commit()
 
-    '''Placeholder function. In future will have different functions for each predictive model.         
-    Query on table Track, filtering down to matching index, and because index is unique there
-    should only be one result so we can take the first result of the query.'''
-    def get_random_song(self):
-        index = random.randint(1, 1000000)
-        track = self.million_session.query(Track).filter(Track.index == index).first()
-        return track.track_id
 
     '''Recommend song adds one row per model for each user with recommended next song and total score for predictive model. 
     right now that score is a random placeholder.'''
     def recommendSong(self, message):
-        # TODO This function needs fixing once models are built
-        raise NotImplementedError
         new_track_id = message['trackID']
         user_id = message['userID']
-        recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
 
+        (model_id, track_id) = self.predictive_models.model_a_recommendation(new_track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id)
 
+        (model_id, track_id) = self.predictive_models.model_b_recommendation(new_track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id)
 
-        r = Recommendation(
-            userID=message['userID'],
-            modelID=1,
-            trackID=self.get_random_song(),
-            model_score=random.randint(1, 100)
-        )
-        '''beat_session is our connection to the beatstream database.'''
-        self.beat_session.add(r)
+        (model_id, track_id) = self.predictive_models.model_c_recommendation(new_track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id)
 
-        r = Recommendation(
-            userID=message['userID'],
-            modelID=2,
-            trackID=self.get_random_song(),
-            model_score=random.randint(1, 100)
-        )
-        self.beat_session.add(r)
-
-        r = Recommendation(
-            userID=message['userID'],
-            modelID=3,
-            trackID=self.get_random_song(),
-            model_score=random.randint(1, 100)
-        )
-        self.beat_session.add(r)
         self.beat_session.commit()
+
+    def create_or_update_recommendation(self, user_id, model_id, track_id):
+        recommendations = self.beat_session.query(Recommendation).filter(
+            Recommendation.userID == user_id, Recommendation.modelID == model_id).all()
+
+        if len(recommendations) > 0:
+            recommendation = recommendations[0]
+            recommendation.trackID = track_id
+        else:
+            recommendation = Recommendation(
+                userID=user_id,
+                modelID=model_id,
+                trackID=track_id,
+                model_score=0
+            )
+        self.beat_session.merge(recommendation)
+
+
 
 
 if __name__ == "__main__":

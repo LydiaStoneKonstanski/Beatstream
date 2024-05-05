@@ -17,7 +17,7 @@ new_topic = Topic('listen-events', 9092)
 
 # assign four cores to the app allowing us to run up to four tasks at a time
 
-# determines the amount of spark partitions to use (the defualt is 200) which seemed too high for our current setup
+# determines the amount of spark partitions to use (the default is 200) which seemed too high for our current setup
 # 1.2 million rows of 1 kb rows
 # 1.2 GB or 1200MB
 # each partition will handle about 12 MB
@@ -99,7 +99,7 @@ formatted_df = spark.sql("""
 # ).groupBy("city").count()
 
 # use spark to create a new DataFrame from the kafka message
-# set the log level to avoid getting too many info-level logs every for every execution.
+# set the log level to avoid getting too many info-level logs for every execution.
 spark.sparkContext.setLogLevel("WARN")
 query = formatted_df \
     .writeStream \

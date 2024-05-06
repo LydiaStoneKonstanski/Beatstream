@@ -5,6 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 import os
 import math
+import pandas as pd
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -145,15 +146,37 @@ class MillionConnection():
         Base.metadata.create_all(self.engine)
         self.session = Session(bind=self.engine)
 
+        # TODO: Decide whether to keep pandas
+        # For now, for performance reasons, reading million data into pandas to avoid excessive queries
+        q = self.session.query(Track.track_id, Track.artist_id, Track.year)
+        self.tracks_df = pd.read_sql(q.statement, self.engine)
+        self.year_lookup = {result.track_id: result.year for result in q}
+        self.artist_lookup = {result.track_id: result.artist_id for result in q}
+
+
     def get_year(self, track_id):
-        track = self.session.query(Track).filter(Track.track_id == track_id).first()
-        year = track.year
+        # SQLAlchemy:
+        #track = self.session.query(Track).filter(Track.track_id == track_id).first()
+        #year = track.year
+
+        #Pandas:
+        #track = self.tracks_df[self.tracks_df['track_id'] == track_id].iloc[0]
+        #year = track.year
+
+        year = self.year_lookup[track_id]
 
         return year
 
     def get_artist_id(self, track_id):
-        track = self.session.query(Track).filter(Track.track_id == track_id).first()
-        artist_id = track.artist_id
+        # SQLAlchemy:
+        # track = self.session.query(Track).filter(Track.track_id == track_id).first()
+        # artist_id = track.artist_id
+
+        # Pandas:
+        # track = self.tracks_df[self.tracks_df['track_id'] == track_id].iloc[0]
+        # artist_id = track.artist_id
+
+        artist_id = self.artist_lookup[track_id]
 
         return artist_id
 

@@ -25,10 +25,12 @@ class ScoreMechanic():
         if new_artist_id==recommended_artist_id:
             score += 5
 
-        similar_artist_ids = self.million_connection.get_similar_artist_ids(new_artist_id)
 
-        if recommended_artist_id in similar_artist_ids:
-            score += 4
+        # TODO: This is too slow to keep up. We need a more efficient way to query to work at this scale.
+        # similar_artist_ids = self.million_connection.get_similar_artist_ids(new_artist_id)
+        #
+        # if recommended_artist_id in similar_artist_ids:
+        #     score += 4
 
         return score
 

@@ -11,7 +11,9 @@ class PredictiveModels():
         ''' Model A returns a random track, ignoring the current track'''
         model_id = "Model A"
         index = random.randint(1, 1000000)
+
         track = self.million_session.query(Track).filter(Track.index == index).first()
+
         return (model_id, track.track_id)
 
     def model_b_recommendation(self, track_id):
@@ -22,8 +24,9 @@ class PredictiveModels():
         model_id = "Model B"
         artist_id = self.million_connection.get_artist_id(track_id)
         tracks = self.million_session.query(Track).filter(Track.artist_id == artist_id).all()
-        random_choice = random.randint(0, len(tracks))
+        random_choice = random.randint(0, len(tracks)-1)
         track = tracks[random_choice]
+
         return (model_id, track.track_id)
 
     def model_c_recommendation(self, track_id):
@@ -32,6 +35,6 @@ class PredictiveModels():
         year = self.million_connection.get_year(track_id)
         decade = self.million_connection.get_decade(year)
         tracks = self.million_session.query(Track).filter(Track.year >= decade, Track.year < decade + 10).all()
-        random_choice = random.randint(0, len(tracks))
+        random_choice = random.randint(0, len(tracks)-1)
         track = tracks[random_choice]
         return (model_id, track.track_id)

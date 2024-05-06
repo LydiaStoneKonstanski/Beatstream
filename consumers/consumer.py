@@ -9,6 +9,10 @@ from connections.beatstream_connection import BeatstreamConnection, User, Recomm
 from score_mechanic import ScoreMechanic
 from predictive_models import PredictiveModels
 
+#TODO: Refactor all 'Get Random Track' queries to have MySQL pick the random track_id, rather than return
+# list for us to pick a random one. This should improve performance. "SELECT RANDOM WHERE ..."
+
+
 ''' Interacts with  both databases.
 In total for consumers we need to establish a scoring system, and have a variety of models that use 
 the current song to generate a recommendation. 
@@ -36,6 +40,7 @@ Raft
 class CurrentSongConsumer:
 
     def __init__(self):
+        print("Initializing CurrentSongConsumer")
         self.beatstream_connection = BeatstreamConnection(local=True)
         self.beat_session = self.beatstream_connection.session
         self.million_connection = MillionConnection(local=True)
@@ -47,16 +52,21 @@ class CurrentSongConsumer:
         )
         self.score_mechanic = ScoreMechanic(self.million_connection)
         self.predictive_models = PredictiveModels(self.million_connection)
+        print("Initialization Complete")
     '''Currently updates user table and recommends a song using each predictive model'''
     def handleMessages(self):
+        count = 0
         for message in self.consumer:
             message = message.value
-            print('{} found'.format(message))
             self.updateUser(message)
             self.scoreModels(message)
             self.recommendSong(message)
+            count += 1
+            if count % 10 == 0:
+                print (f"Handled {count} total messages")
 
-            return
+
+            #return
 
     '''Shows current song for user.'''
     def updateUser(self, message):
@@ -92,8 +102,9 @@ class CurrentSongConsumer:
         (model_id, track_id) = self.predictive_models.model_b_recommendation(new_track_id)
         self.create_or_update_recommendation(user_id, model_id, track_id)
 
-        (model_id, track_id) = self.predictive_models.model_c_recommendation(new_track_id)
-        self.create_or_update_recommendation(user_id, model_id, track_id)
+        #TODO Reactivate this once performance is better
+        # (model_id, track_id) = self.predictive_models.model_c_recommendation(new_track_id)
+        # self.create_or_update_recommendation(user_id, model_id, track_id)
 
         self.beat_session.commit()
 
@@ -120,12 +131,12 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
+    main()
     #cProfile.run('main()')
 
-    with cProfile.Profile() as profile:
-        main()
-
-    profile_result = pstats.Stats(profile)
-    profile_result.sort_stats(pstats.SortKey.TIME)
-    profile_result.print_stats()
+    # with cProfile.Profile() as profile:
+    #     main()
+    #
+    # profile_result = pstats.Stats(profile)
+    # profile_result.sort_stats(pstats.SortKey.TIME)
+    # profile_result.print_stats()

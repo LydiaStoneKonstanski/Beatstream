@@ -130,8 +130,8 @@ df3 = df3.withWatermark("event_time", "10 minutes")
 df2 = df2.withColumnRenamed('artist_name', 'artist')
 df3 = df3.withColumnRenamed('artist_name', 'artist')
 df.createOrReplaceTempView("events")
-df2.createOrReplaceTempView("analysis")
-df3.createOrReplaceTempView("tracks")
+df2.createOrReplaceTempView("tracks_details")
+df3.createOrReplaceTempView("tracks_artists")
 
 
 # tracks = spark.sql("""
@@ -143,14 +143,51 @@ df3.createOrReplaceTempView("tracks")
 # ON e.artist = t.artist
 # """)
 # ok
-tracks_aggregated = spark.sql("""
-SELECT e.artist,
-       count(*) as num_tracks,
-       regexp_replace(t.artist, '^b\\\\''|''$', '') AS cleaned_artist,
-       regexp_replace(t.track_id, '^b\\\\''|''$', '') AS cleaned_track_id
-FROM events e
-LEFT OUTER JOIN tracks t ON e.artist = t.artist
-GROUP BY e.artist, t.artist, t.track_id
+# tracks = spark.sql("""
+# SELECT
+#        regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
+#        regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id
+# FROM track_artists
+# """)
+
+
+
+# result_df = spark.sql("""
+# SELECT td.time_signature, td.tempo, td.mode, td.loudness, td.key, ta.artist
+# FROM tracks_artists ta
+# JOIN tracks_details td ON ta.track_id = td.track_id
+# """)
+
+
+# combined_query = spark.sql("""
+# WITH CleanedTracks AS (
+#     SELECT
+#         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
+#         regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id
+#     FROM tracks_artists
+# )
+# SELECT td.time_signature, td.tempo, td.mode, td.loudness, td.key, ct.artist
+# FROM CleanedTracks ct
+# JOIN tracks_details td ON ct.track_id = td.track_id
+# """)
+
+combined_clean_query = spark.sql("""
+WITH cleaned_tracks AS (
+    SELECT
+        regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
+        regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
+    FROM tracks_artists
+),
+cleaned_details AS (
+    SELECT
+        time_signature, tempo, mode, loudness, key,
+        regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
+    FROM tracks_details
+)
+SELECT
+    cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key, ct.artist
+FROM cleaned_tracks ct
+JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
 """)
 
 # SELECT TRIM('#! ' FROM '    #SQL Tutorial!    ') AS TrimmedString;
@@ -166,7 +203,7 @@ GROUP BY e.artist, t.artist, t.track_id
 
 
 spark.sparkContext.setLogLevel("WARN")
-query = tracks_aggregated \
+query = combined_clean_query \
     .writeStream \
     .format("console") \
     .outputMode("append") \
@@ -213,13 +250,5 @@ spark.stop()
 
 # set the log level to avoid getting too many info-level logs every for every execution.
 
-spark.sparkContext.setLogLevel("WARN")
-query = formatted_df \
-    .writeStream \
-    .format("console") \
-    .outputMode("complete") \
-    .start()
-query.awaitTermination()
-query.stop()
-spark.stop()
+
 

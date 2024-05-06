@@ -26,13 +26,15 @@ new_topic = Topic('listen-events', 9092)
 
 spark = SparkSession.builder \
     .appName("beat_streamer") \
-    .config("spark.executor.memory", "2g") \
-    .config("spark.driver.memory", '1g') \
-    .config("spark.executor.cores", "3") \
+    .config("spark.executor.memory", "6g") \
+    .config("spark.driver.memory", '6g') \
+    .config("spark.executor.cores", "7") \
     .config("spark.sql.shuffle.partitions", "200") \
     .config("spark.dynamicAllocation.enabled", "true") \
     .config("spark.dynamicAllocation.minExecutors", "1") \
-    .config("spark.dynamicAllocation.maxExecutors", "20") \
+    .config("spark.dynamicAllocation.maxExecutors", "25") \
+    .config("spark.executor.extraJavaOptions", "-XX:+UseG1GC") \
+    .config("spark.driver.extraJavaOptions", "-XX:+UseG1GC") \
     .getOrCreate()
 
 
@@ -82,7 +84,7 @@ df = spark \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", f"{new_topic.topic}") \
     .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 20000) \
+    .option("maxOffsetsPerTrigger", 10000) \
     .load() \
     .select(from_json(col("value").cast("string"), schema1).alias("data")) \
     .select("data.*")
@@ -93,7 +95,7 @@ df2 = spark \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", "analysis") \
     .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 20000) \
+    .option("maxOffsetsPerTrigger", 10000) \
     .load() \
     .select(from_json(col("value").cast("string"), schema2).alias("data2")) \
     .select("data2.*")
@@ -105,7 +107,7 @@ df3 = spark \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", "tracks") \
     .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 20000) \
+    .option("maxOffsetsPerTrigger", 10000) \
     .load() \
     .select(from_json(col("value").cast("string"), schema3).alias("data3")) \
     .select("data3.*")
@@ -219,6 +221,23 @@ JOIN cleaned_tracks ct ON e.cleaned_artist = ct.artist
 JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
 """)
 
+
+
+
+
+query = combined_and_events_query \
+    .coalesce(4) \
+    .writeStream \
+    .format("parquet") \
+    .option("path", "/Users/chris/pyprojects/Beatstream/data") \
+    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
+    .trigger(processingTime='5 minutes') \
+    .start()
+query.awaitTermination()
+
+
+
+
 # SELECT TRIM('#! ' FROM '    #SQL Tutorial!    ') AS TrimmedString;
 #
 #
@@ -231,15 +250,15 @@ JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
 
 
 
-spark.sparkContext.setLogLevel("WARN")
-query = combined_and_events_query \
-    .writeStream \
-    .format("console") \
-    .outputMode("append") \
-    .start()
-query.awaitTermination()
-query.stop()
-spark.stop()
+# spark.sparkContext.setLogLevel("WARN")
+# query = combined_and_events_query \
+#     .writeStream \
+#     .format("console") \
+#     .outputMode("append") \
+#     .start()
+# query.awaitTermination()
+# query.stop()
+# spark.stop()
 
 
 

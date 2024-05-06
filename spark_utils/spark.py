@@ -171,7 +171,28 @@ df3.createOrReplaceTempView("tracks_artists")
 # JOIN tracks_details td ON ct.track_id = td.track_id
 # """)
 
-combined_clean_query = spark.sql("""
+# combined_clean_query = spark.sql("""
+# WITH cleaned_tracks AS (
+#     SELECT
+#         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
+#         regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
+#     FROM tracks_artists
+# ),
+# cleaned_details AS (
+#     SELECT
+#         time_signature, tempo, mode, loudness, key,
+#         regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
+#     FROM tracks_details
+# )
+# SELECT
+#     cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key, ct.artist
+# FROM cleaned_tracks ct
+# JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
+# """)
+
+
+
+combined_and_events_query = spark.sql("""
 WITH cleaned_tracks AS (
     SELECT
         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
@@ -183,10 +204,18 @@ cleaned_details AS (
         time_signature, tempo, mode, loudness, key,
         regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
     FROM tracks_details
+),
+cleaned_events AS (
+    SELECT
+        song, ts, city, zip, state, userId, duration,
+        regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS cleaned_artist
+    FROM events
 )
 SELECT
-    cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key, ct.artist
-FROM cleaned_tracks ct
+    e.song, e.ts, e.city, e.zip, e.state, e.userId, e.duration,
+    e.cleaned_artist, cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key
+FROM cleaned_events e
+JOIN cleaned_tracks ct ON e.cleaned_artist = ct.artist
 JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
 """)
 
@@ -203,7 +232,7 @@ JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
 
 
 spark.sparkContext.setLogLevel("WARN")
-query = combined_clean_query \
+query = combined_and_events_query \
     .writeStream \
     .format("console") \
     .outputMode("append") \

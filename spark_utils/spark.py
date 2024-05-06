@@ -142,7 +142,7 @@ df3.createOrReplaceTempView("tracks")
 # LEFT OUTER JOIN tracks t
 # ON e.artist = t.artist
 # """)
-
+# ok
 tracks_aggregated = spark.sql("""
 SELECT e.artist,
        count(*) as num_tracks,

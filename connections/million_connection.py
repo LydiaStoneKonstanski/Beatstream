@@ -4,6 +4,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 import os
+import math
+import pandas as pd
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -143,6 +145,57 @@ class MillionConnection():
 
         Base.metadata.create_all(self.engine)
         self.session = Session(bind=self.engine)
+
+        # TODO: Decide whether to keep pandas
+        # For now, for performance reasons, reading million data into pandas to avoid excessive queries
+        q = self.session.query(Track.track_id, Track.artist_id, Track.year)
+        self.tracks_df = pd.read_sql(q.statement, self.engine)
+        self.year_lookup = {result.track_id: result.year for result in q}
+        self.artist_lookup = {result.track_id: result.artist_id for result in q}
+
+
+    def get_year(self, track_id):
+        # SQLAlchemy:
+        #track = self.session.query(Track).filter(Track.track_id == track_id).first()
+        #year = track.year
+
+        #Pandas:
+        #track = self.tracks_df[self.tracks_df['track_id'] == track_id].iloc[0]
+        #year = track.year
+
+        year = self.year_lookup[track_id]
+
+        return year
+
+    def get_artist_id(self, track_id):
+        # SQLAlchemy:
+        # track = self.session.query(Track).filter(Track.track_id == track_id).first()
+        # artist_id = track.artist_id
+
+        # Pandas:
+        # track = self.tracks_df[self.tracks_df['track_id'] == track_id].iloc[0]
+        # artist_id = track.artist_id
+
+        artist_id = self.artist_lookup[track_id]
+
+        return artist_id
+
+    def get_similar_artist_ids(self, artist_id):
+        artist_ids = []
+        similar_match = self.session.query(Similarity).filter(Similarity.similar == artist_id).all()
+
+        for artist in similar_match:
+            artist_ids.append(artist.target)
+
+        target_match = self.session.query(Similarity).filter(Similarity.target == artist_id).all()
+
+        for artist in target_match:
+            artist_ids.append(artist.similar)
+
+        return artist_ids
+
+    def get_decade(self, year):
+        return math.floor(year / 10) * 10
 
 
 if __name__ == "__main__":

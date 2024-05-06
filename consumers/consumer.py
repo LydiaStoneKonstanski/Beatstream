@@ -1,10 +1,17 @@
-import sqlite3
+
+import cProfile
+import pstats
 
 from kafka import KafkaConsumer
 from json import loads
 from connections.million_connection import MillionConnection, Track
 from connections.beatstream_connection import BeatstreamConnection, User, Recommendation
-import random
+from score_mechanic import ScoreMechanic
+from predictive_models import PredictiveModels
+
+#TODO: Refactor all 'Get Random Track' queries to have MySQL pick the random track_id, rather than return
+# list for us to pick a random one. This should improve performance. "SELECT RANDOM WHERE ..."
+
 
 ''' Interacts with  both databases.
 In total for consumers we need to establish a scoring system, and have a variety of models that use 
@@ -33,6 +40,7 @@ Raft
 class CurrentSongConsumer:
 
     def __init__(self):
+        print("Initializing CurrentSongConsumer")
         self.beatstream_connection = BeatstreamConnection(local=True)
         self.beat_session = self.beatstream_connection.session
         self.million_connection = MillionConnection(local=True)
@@ -42,13 +50,23 @@ class CurrentSongConsumer:
             bootstrap_servers=['localhost:9092'],
             value_deserializer=lambda m: loads(m.decode('ascii'))
         )
+        self.score_mechanic = ScoreMechanic(self.million_connection)
+        self.predictive_models = PredictiveModels(self.million_connection)
+        print("Initialization Complete")
     '''Currently updates user table and recommends a song using each predictive model'''
     def handleMessages(self):
+        count = 0
         for message in self.consumer:
             message = message.value
-            print('{} found'.format(message))
             self.updateUser(message)
+            self.scoreModels(message)
             self.recommendSong(message)
+            count += 1
+            if count % 10 == 0:
+                print (f"Handled {count} total messages")
+
+
+            #return
 
     '''Shows current song for user.'''
     def updateUser(self, message):
@@ -60,47 +78,65 @@ class CurrentSongConsumer:
 
         self.beat_session.commit()
 
-    '''Placeholder function. In future will have different functions for each predictive model.         
-    Query on table Track, filtering down to matching index, and because index is unique there
-    should only be one result so we can take the first result of the query.'''
-    def get_random_song(self):
-        index = random.randint(1, 1000000)
-        track = self.million_session.query(Track).filter(Track.index == index).first()
-        return track.track_id
+    def scoreModels(self, message):
+        new_track_id = message['trackID']
+        user_id = message['userID']
+        recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
+        for recommendation in recommendations:
+            recommended_track_id = recommendation.trackID
+            score = self.score_mechanic.get_score(new_track_id, recommended_track_id)
+            recommendation.model_score += score
+            self.beat_session.add(recommendation)
+        self.beat_session.commit()
+
 
     '''Recommend song adds one row per model for each user with recommended next song and total score for predictive model. 
     right now that score is a random placeholder.'''
     def recommendSong(self, message):
-        # Delete previous recommendations for this user
-        self.beat_session.query(Recommendation).filter(Recommendation.userID == message['userID']).delete()
-        # Add new recommendations
-        r = Recommendation(
-            userID=message['userID'],
-            modelID=1,
-            trackID=self.get_random_song(),
-            model_score=random.randint(1, 100)
-        )
-        '''beat_session is our connection to the beatstream database.'''
-        self.beat_session.add(r)
+        new_track_id = message['trackID']
+        user_id = message['userID']
 
-        r = Recommendation(
-            userID=message['userID'],
-            modelID=2,
-            trackID=self.get_random_song(),
-            model_score=random.randint(1, 100)
-        )
-        self.beat_session.add(r)
+        (model_id, track_id) = self.predictive_models.model_a_recommendation(new_track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id)
 
-        r = Recommendation(
-            userID=message['userID'],
-            modelID=3,
-            trackID=self.get_random_song(),
-            model_score=random.randint(1, 100)
-        )
-        self.beat_session.add(r)
+        (model_id, track_id) = self.predictive_models.model_b_recommendation(new_track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id)
+
+        #TODO Reactivate this once performance is better
+        # (model_id, track_id) = self.predictive_models.model_c_recommendation(new_track_id)
+        # self.create_or_update_recommendation(user_id, model_id, track_id)
+
         self.beat_session.commit()
+
+    def create_or_update_recommendation(self, user_id, model_id, track_id):
+        recommendations = self.beat_session.query(Recommendation).filter(
+            Recommendation.userID == user_id, Recommendation.modelID == model_id).all()
+
+        if len(recommendations) > 0:
+            recommendation = recommendations[0]
+            recommendation.trackID = track_id
+        else:
+            recommendation = Recommendation(
+                userID=user_id,
+                modelID=model_id,
+                trackID=track_id,
+                model_score=0
+            )
+        self.beat_session.merge(recommendation)
+
+
+def main():
+    c = CurrentSongConsumer()
+    c.handleMessages()
 
 
 if __name__ == "__main__":
-    c = CurrentSongConsumer()
-    c.handleMessages()
+    main()
+    #cProfile.run('main()')
+
+    # with cProfile.Profile() as profile:
+    #     main()
+    #
+    # profile_result = pstats.Stats(profile)
+    # profile_result.sort_stats(pstats.SortKey.TIME)
+    # profile_result.print_stats()

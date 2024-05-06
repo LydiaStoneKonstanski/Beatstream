@@ -20,8 +20,8 @@ class Recommendation(Base):
     __tablename__ = 'recommendations'
     id = Column(Integer, primary_key=True)
     userID = Column(Integer)
-    modelID = Column(Integer)
-    trackID = Column(String(250))
+    modelID = Column(String(50))
+    trackID = Column(String(25))
     model_score = Column(DECIMAL)
 
     def __init__(self, userID, modelID, trackID, model_score):

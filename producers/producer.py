@@ -33,18 +33,22 @@ currently active users in displays.
 class CurrentSongProducer:
 
     def __init__(self):
+        print("Initializing CurrentSongProducer")
         self.million_connection = MillionConnection(local=True)
         self.million_session = self.million_connection.session
         self.producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
                          value_serializer=lambda m: dumps(m).encode('ascii'))
+        print("Initialization Complete")
 
     def makeMessages(self):
+        count = 0
         for i in range(1000):
             for userID in range(1,11):
                 track_id = self.get_random_song()
                 data = {'userID': userID, 'trackID': track_id}
                 self.producer.send('user_current_song', value=data)
-                print(data)
+                count += 1
+            print(f"Sent {count} total messages")
             sleep(2)
 
     def get_random_song(self):

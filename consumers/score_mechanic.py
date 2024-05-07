@@ -7,7 +7,10 @@ class ScoreMechanic():
 
 #TODO add additional scoring such as mb tag and term.
     def get_score(self, new_track_id, recommended_track_id):
-        score=0
+        score = 0
+        if new_track_id is None or recommended_track_id is None:
+            return score
+
         if recommended_track_id==new_track_id:
             score+=10
         new_year = self.million_connection.get_year(new_track_id)

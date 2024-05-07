@@ -65,19 +65,22 @@ class CurrentSongProducer:
 
     def makeMessages(self):
         count = 0
-        for user in self.users:
-            track_id = self.get_next_track(user)
-            data = {'userID': user.user_id, 'trackID': track_id}
-            self.producer.send('user_current_song', value=data)
-        print(f"Sent {count} total messages")
-        sleep(2)
+        for i in range(1000):
+            for user in self.users:
+                track_id = self.get_next_track(user)
+                data = {'userID': user.user_id, 'trackID': track_id}
+                self.producer.send('user_current_song', value=data)
+                count += 1
+            print(f"Sent {count} total messages")
+            sleep(2)
 
     def get_next_track(self, user):
         current_track_id = user.current_track_id
         rand = random.random()
         i = 0
         while user.profile.cumulative[i] <= rand:
-            continue
+            i += 1
+
         match i:
             case 0:
                 return None

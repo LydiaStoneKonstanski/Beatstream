@@ -62,7 +62,7 @@ class CurrentSongConsumer:
             self.scoreModels(message)
             self.recommendSong(message)
             count += 1
-            if count % 10 == 0:
+            if count % 30 == 0:
                 print (f"Handled {count} total messages")
 
 
@@ -94,6 +94,8 @@ class CurrentSongConsumer:
     right now that score is a random placeholder.'''
     def recommendSong(self, message):
         new_track_id = message['trackID']
+        if new_track_id == "None":
+            new_track_id = None
         user_id = message['userID']
 
         (model_id, track_id) = self.predictive_models.model_a_recommendation(new_track_id)

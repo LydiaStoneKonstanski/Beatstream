@@ -156,6 +156,9 @@ class MillionConnection():
 
 
     def get_year(self, track_id):
+        if track_id is None:
+            return None
+
         # SQLAlchemy:
         #track = self.session.query(Track).filter(Track.track_id == track_id).first()
         #year = track.year
@@ -169,6 +172,8 @@ class MillionConnection():
         return year
 
     def get_artist_id(self, track_id):
+        if track_id is None:
+            return None
         # SQLAlchemy:
         # track = self.session.query(Track).filter(Track.track_id == track_id).first()
         # artist_id = track.artist_id
@@ -204,6 +209,8 @@ class MillionConnection():
         return track.track_id
 
     def get_same_artist_track_id(self, current_track_id):
+        if current_track_id is None:
+            return self.get_random_track_id()
         artist_id = self.get_artist_id(current_track_id)
         tracks = self.session.query(Track).filter(Track.artist_id == artist_id).all()
         random_choice = random.randint(0, len(tracks) - 1)
@@ -211,6 +218,8 @@ class MillionConnection():
         return track.track_id
 
     def get_same_decade_track_id(self, current_track_id):
+        if current_track_id is None:
+            return self.get_random_track_id()
         year = self.get_year(current_track_id)
         decade = self.get_decade(year)
         tracks = self.session.query(Track).filter(Track.year >= decade, Track.year < decade + 10).all()

@@ -9,7 +9,7 @@ Base = sqlalchemy.orm.declarative_base()
 
 class User(Base):
     __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
+    id = Column(String(40), primary_key=True)
     current_song = Column(String(250))
 
     def __init__(self, id, current_song):
@@ -19,7 +19,7 @@ class User(Base):
 class Recommendation(Base):
     __tablename__ = 'recommendations'
     id = Column(Integer, primary_key=True)
-    userID = Column(Integer)
+    userID = Column(String(40))
     modelID = Column(String(50))
     trackID = Column(String(25))
     model_score = Column(DECIMAL)

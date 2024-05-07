@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 import os
 import math
 import pandas as pd
+import random
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -196,6 +197,11 @@ class MillionConnection():
 
     def get_decade(self, year):
         return math.floor(year / 10) * 10
+
+    def get_random_track_id(self):
+        index = random.randint(1, 1000000)
+        track = self.session.query(Track).filter(Track.index == index).first()
+        return track.track_id
 
 
 if __name__ == "__main__":

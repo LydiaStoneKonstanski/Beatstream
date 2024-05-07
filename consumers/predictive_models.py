@@ -10,11 +10,9 @@ class PredictiveModels():
     def model_a_recommendation(self, current_track_id):
         ''' Model A returns a random track, ignoring the current track'''
         model_id = "Model A"
-        index = random.randint(1, 1000000)
+        track_id = self.million_connection.get_random_track_id()
 
-        track = self.million_session.query(Track).filter(Track.index == index).first()
-
-        return (model_id, track.track_id)
+        return (model_id, track_id)
 
     def model_b_recommendation(self, track_id):
         '''

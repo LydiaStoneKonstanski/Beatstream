@@ -1,11 +1,11 @@
 import uuid
-
+from itertools import accumulate
 class User():
 
     def __init__(self, profile):
         self.profile = profile
         self.user_id = uuid.uuid1()
-        self.current_song = None
+        self.current_track_id = None
 
 
 class UserProfile():
@@ -16,6 +16,7 @@ class UserProfile():
         self.stability = stability
         total_weights = sum(weights)
         self.probabilities = [x/total_weights for x in self.weights]
+        self.cumulative = list(accumulate(self.probabilities))
 
     def create_user(self):
         return User(self)

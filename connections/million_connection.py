@@ -203,6 +203,21 @@ class MillionConnection():
         track = self.session.query(Track).filter(Track.index == index).first()
         return track.track_id
 
+    def get_same_artist_track_id(self, current_track_id):
+        artist_id = self.get_artist_id(current_track_id)
+        tracks = self.session.query(Track).filter(Track.artist_id == artist_id).all()
+        random_choice = random.randint(0, len(tracks) - 1)
+        track = tracks[random_choice]
+        return track.track_id
+
+    def get_same_decade_track_id(self, current_track_id):
+        year = self.get_year(current_track_id)
+        decade = self.get_decade(year)
+        tracks = self.session.query(Track).filter(Track.year >= decade, Track.year < decade + 10).all()
+        random_choice = random.randint(0, len(tracks) - 1)
+        track = tracks[random_choice]
+        return track.track_id
+
 
 if __name__ == "__main__":
     m = MillionConnection()

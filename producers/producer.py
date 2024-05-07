@@ -73,6 +73,20 @@ class CurrentSongProducer:
         sleep(2)
 
     def get_next_track(self, user):
+        current_track_id = user.current_track_id
+        rand = random.random()
+        i = 0
+        while user.profile.cumulative[i] <= rand:
+            continue
+        match i:
+            case 0:
+                return None
+            case 1:
+                return self.million_connection.get_random_track_id()
+            case 2:
+                return self.million_connection.get_same_artist_track_id(current_track_id)
+            case 3:
+                return self.million_connection.get_same_decade_track_id(current_track_id)
 
 
 

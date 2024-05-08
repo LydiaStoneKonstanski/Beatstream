@@ -8,6 +8,7 @@ from connections.million_connection import MillionConnection, Track
 from connections.beatstream_connection import BeatstreamConnection, User, Recommendation
 from score_mechanic import ScoreMechanic
 from predictive_models import PredictiveModels
+from timeit import default_timer as timer
 
 #TODO: Refactor all 'Get Random Track' queries to have MySQL pick the random track_id, rather than return
 # list for us to pick a random one. This should improve performance. "SELECT RANDOM WHERE ..."
@@ -56,17 +57,23 @@ class CurrentSongConsumer:
     '''Currently updates user table and recommends a song using each predictive model'''
     def handleMessages(self):
         count = 0
+        start = timer()
         for message in self.consumer:
             message = message.value
             self.updateUser(message)
-            self.scoreModels(message)
-            self.recommendSong(message)
+            existing_recommendations = self.getExistingRecommendations(message)
+            self.scoreModels(message, existing_recommendations)
+            self.recommendSong(message, existing_recommendations)
+            self.beat_session.commit()
             count += 1
-            if count % 30 == 0:
-                print (f"Handled {count} total messages")
+            if count % 3000 == 0:
+                end = timer()
+                print (f"Handled {count} total messages. Took {end - start} seconds.")
+                start = timer()
+
+                #return
 
 
-            #return
 
     '''Shows current song for user.'''
     def updateUser(self, message):
@@ -76,54 +83,62 @@ class CurrentSongConsumer:
         )
         self.beat_session.merge(u)
 
-        self.beat_session.commit()
+        #self.beat_session.commit()
 
-    def scoreModels(self, message):
+    def scoreModels(self, message, existing_recommendations):
         new_track_id = message['trackID']
         user_id = message['userID']
-        recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
-        for recommendation in recommendations:
+        #recommendations = self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
+        for recommendation in existing_recommendations:
             recommended_track_id = recommendation.trackID
             score = self.score_mechanic.get_score(new_track_id, recommended_track_id)
             recommendation.model_score += score
             self.beat_session.add(recommendation)
-        self.beat_session.commit()
+        #self.beat_session.commit()
+
+    def getExistingRecommendations(self, message):
+        user_id = message['userID']
+        return self.beat_session.query(Recommendation).filter(Recommendation.userID == user_id).all()
 
 
     '''Recommend song adds one row per model for each user with recommended next song and total score for predictive model. 
     right now that score is a random placeholder.'''
-    def recommendSong(self, message):
+    def recommendSong(self, message, existing_recommendations):
         new_track_id = message['trackID']
         if new_track_id == "None":
             new_track_id = None
         user_id = message['userID']
 
         (model_id, track_id) = self.predictive_models.model_a_recommendation(new_track_id)
-        self.create_or_update_recommendation(user_id, model_id, track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id, existing_recommendations)
 
         (model_id, track_id) = self.predictive_models.model_b_recommendation(new_track_id)
-        self.create_or_update_recommendation(user_id, model_id, track_id)
+        self.create_or_update_recommendation(user_id, model_id, track_id, existing_recommendations)
 
         #TODO Reactivate this once performance is better
         # (model_id, track_id) = self.predictive_models.model_c_recommendation(new_track_id)
         # self.create_or_update_recommendation(user_id, model_id, track_id)
 
-        self.beat_session.commit()
+        #self.beat_session.commit()
 
-    def create_or_update_recommendation(self, user_id, model_id, track_id):
-        recommendations = self.beat_session.query(Recommendation).filter(
-            Recommendation.userID == user_id, Recommendation.modelID == model_id).all()
+    def create_or_update_recommendation(self, user_id, model_id, track_id, existing_recommendations):
+        # recommendations = self.beat_session.query(Recommendation).filter(
+        #     Recommendation.userID == user_id, Recommendation.modelID == model_id).all()
+        recommendation = None
+        for recommendation in existing_recommendations:
+            if recommendation.modelID == model_id:
+                recommendation = existing_recommendations[0]
+                recommendation.trackID = track_id
+                break
 
-        if len(recommendations) > 0:
-            recommendation = recommendations[0]
-            recommendation.trackID = track_id
-        else:
+        if recommendation is None:
             recommendation = Recommendation(
                 userID=user_id,
                 modelID=model_id,
                 trackID=track_id,
                 model_score=0
             )
+
         self.beat_session.merge(recommendation)
 
 
@@ -134,11 +149,11 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #cProfile.run('main()')
+
 
     # with cProfile.Profile() as profile:
     #     main()
     #
-    # profile_result = pstats.Stats(profile)
-    # profile_result.sort_stats(pstats.SortKey.TIME)
-    # profile_result.print_stats()
+    # stats = pstats.Stats(profile).sort_stats("cumtime")
+    # stats.print_stats(r"\((?!\_).*\)$")  # Exclude private and magic callables.
+

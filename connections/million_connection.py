@@ -1,6 +1,8 @@
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, DECIMAL, create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.sql import func
+from sqlalchemy.orm import load_only
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 import os
@@ -204,9 +206,10 @@ class MillionConnection():
         return math.floor(year / 10) * 10
 
     def get_random_track_id(self):
+        #track_id = self.tracks_df.sample(n=1).track_id.values[0]
         index = random.randint(1, 1000000)
-        track = self.session.query(Track).filter(Track.index == index).first()
-        return track.track_id
+        track_id = self.session.query(Track).filter(Track.index == index).first().track_id
+        return track_id
 
     def get_same_artist_track_id(self, current_track_id):
         if current_track_id is None:
@@ -221,6 +224,8 @@ class MillionConnection():
         if current_track_id is None:
             return self.get_random_track_id()
         year = self.get_year(current_track_id)
+        if year is 0:
+            return self.get_random_track_id()
         decade = self.get_decade(year)
         tracks = self.session.query(Track).filter(Track.year >= decade, Track.year < decade + 10).all()
         random_choice = random.randint(0, len(tracks) - 1)

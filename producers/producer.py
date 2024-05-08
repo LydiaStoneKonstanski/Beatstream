@@ -60,7 +60,7 @@ class CurrentSongProducer:
         user_profiles = UserProfiles()
         users = []
         for profile in user_profiles.profiles:
-            for i in range(1000):
+            for i in range(10000):
                 user = profile.create_user()
                 users.append(user)
         return users
@@ -69,14 +69,16 @@ class CurrentSongProducer:
         count = 0
         for i in range(1000):
             start = timer()
+
             for user in self.users:
                 track_id = self.get_next_track(user)
                 data = {'userID': user.user_id, 'trackID': track_id}
                 self.producer.send('user_current_song', value=data)
                 count += 1
+            sleep(20)
             end = timer()
             print(f"Sent {count} total messages. Took {end - start} seconds.")
-            sleep(2)
+
 
     def get_next_track(self, user):
         current_track_id = user.current_track_id

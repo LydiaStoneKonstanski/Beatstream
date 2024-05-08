@@ -66,7 +66,7 @@ class CurrentSongConsumer:
             self.recommendSong(message, existing_recommendations)
             self.beat_session.commit()
             count += 1
-            if count % 3000 == 0:
+            if count % 30000 == 0:
                 end = timer()
                 print (f"Handled {count} total messages. Took {end - start} seconds.")
                 start = timer()

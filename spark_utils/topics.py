@@ -21,6 +21,7 @@ class Topic:
         self.failure += 1
         logging.error('failed to send', exc_info=excp)
         print(self.failure)
+        #todo send the logs to a database
 
     def on_send_success(self, metadata):
         self.success += 1
@@ -28,6 +29,7 @@ class Topic:
         print(f'Partition: {metadata.partition}')
         print(f'Offset: {metadata.offset}')
         print(f'messages(rows): {self.success}')
+        #todo create logs for successes
     def j_produce(self):
         producer = KafkaProducer(bootstrap_servers=f'localhost:{self.port}',
                                  value_serializer=lambda x: dumps(x).encode('utf-8'),
@@ -39,7 +41,7 @@ class Topic:
                     .add_callback(self.on_send_success) \
                     .add_errback(self.on_send_error)
                 # add more informative responses to err and call bak functions, (metadata, offset, and so on)
-            producer.flush()  # ensures all messages are set before the close
+            producer.flush()  # ensures all messages are sent before the close
             producer.close()
 
     def c_produce(self):

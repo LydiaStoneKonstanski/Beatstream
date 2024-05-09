@@ -29,7 +29,7 @@ spark = SparkSession.builder \
     .config("spark.executor.memory", "6g") \
     .config("spark.driver.memory", '6g') \
     .config("spark.executor.cores", "7") \
-    .config("spark.sql.shuffle.partitions", "200") \
+    .config("spark.sql.shuffle.partitions", "100") \
     .config("spark.dynamicAllocation.enabled", "true") \
     .config("spark.dynamicAllocation.minExecutors", "1") \
     .config("spark.dynamicAllocation.maxExecutors", "25") \
@@ -48,7 +48,8 @@ schema1 = StructType([
     StructField("zip", StringType(), True),
     StructField("state", StringType(), True),
     StructField("userId", IntegerType(), True),
-    StructField("duration", DoubleType(), True)
+    StructField("duration", DoubleType(), True),
+    StructField("gender", StringType(), True)
     # StructField("lastname", StringType(), True),
     # StructField("firstname", StringType(), True),
 ])
@@ -131,6 +132,7 @@ df3 = df3.withWatermark("event_time", "10 minutes")
 
 df2 = df2.withColumnRenamed('artist_name', 'artist')
 df3 = df3.withColumnRenamed('artist_name', 'artist')
+
 df.createOrReplaceTempView("events")
 df2.createOrReplaceTempView("tracks_details")
 df3.createOrReplaceTempView("tracks_artists")
@@ -198,7 +200,7 @@ combined_and_events_query = spark.sql("""
 WITH cleaned_tracks AS (
     SELECT
         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
-        regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
+        regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id
     FROM tracks_artists
 ),
 cleaned_details AS (
@@ -209,31 +211,31 @@ cleaned_details AS (
 ),
 cleaned_events AS (
     SELECT
-        song, ts, city, zip, state, userId, duration,
+        song, ts, city, zip, state, userId, gender, duration,
         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS cleaned_artist
     FROM events
 )
 SELECT
-    e.song, e.ts, e.city, e.zip, e.state, e.userId, e.duration,
-    e.cleaned_artist, cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key
+    e.song, e.date, e.city, e.zip, e.state, e.userId, e.gender, e.duration,
+    e.cleaned_artist, cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key, ct.track_id
 FROM cleaned_events e
 JOIN cleaned_tracks ct ON e.cleaned_artist = ct.artist
-JOIN cleaned_details cd ON ct.cleaned_track_id = cd.cleaned_track_id
+JOIN cleaned_details cd ON ct.track_id = cd.cleaned_track_id
 """)
 
 
 
 
 
-query = combined_and_events_query \
-    .coalesce(4) \
-    .writeStream \
-    .format("parquet") \
-    .option("path", "/Users/chris/pyprojects/Beatstream/data") \
-    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
-    .trigger(processingTime='5 minutes') \
-    .start()
-query.awaitTermination()
+# query = combined_and_events_query \
+#     .coalesce(4) \
+#     .writeStream \
+#     .format("parquet") \
+#     .option("path", "/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs") \
+#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
+#     .trigger(processingTime='2 minutes') \
+#     .start()
+# query.awaitTermination()
 
 
 
@@ -250,15 +252,15 @@ query.awaitTermination()
 
 
 
-# spark.sparkContext.setLogLevel("WARN")
-# query = combined_and_events_query \
-#     .writeStream \
-#     .format("console") \
-#     .outputMode("append") \
-#     .start()
-# query.awaitTermination()
-# query.stop()
-# spark.stop()
+spark.sparkContext.setLogLevel("WARN")
+query = combined_and_events_query \
+    .writeStream \
+    .format("console") \
+    .outputMode("append") \
+    .start()
+query.awaitTermination()
+query.stop()
+spark.stop()
 
 
 

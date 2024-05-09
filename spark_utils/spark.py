@@ -69,7 +69,8 @@ schema2 = StructType([
 
 schema3 = StructType([
     StructField("track_id", StringType(), True),
-    StructField("artist_name", StringType(), True)
+    StructField("artist_name", StringType(), True),
+    StructField("artist_id", StringType(),True)
     # StructField("lastname", StringType(), True),
     # StructField("firstname", StringType(), True),
 ])
@@ -200,7 +201,8 @@ combined_and_events_query = spark.sql("""
 WITH cleaned_tracks AS (
     SELECT
         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
-        regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id
+        regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id,
+        regexp_replace(artist_id, "^b\\\\'|'$", '') AS cleaned_artist_id
     FROM tracks_artists
 ),
 cleaned_details AS (
@@ -217,25 +219,25 @@ cleaned_events AS (
 )
 SELECT
     e.song, e.date, e.city, e.zip, e.state, e.userId, e.gender, e.duration,
-    e.cleaned_artist, cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key, ct.track_id
+    e.cleaned_artist artist, cd.time_signature, cd.tempo, cd.mode, cd.loudness, cd.key, ct.cleaned_artist_id artist_id, ct.track_id
 FROM cleaned_events e
 JOIN cleaned_tracks ct ON e.cleaned_artist = ct.artist
 JOIN cleaned_details cd ON ct.track_id = cd.cleaned_track_id
 """)
 
 
-spark.sparkContext.setLogLevel("WARN")
-query = combined_and_events_query \
-    .coalesce(1) \
-    .writeStream \
-    .format("parquet") \
-    .option("path", "/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs") \
-    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
-    .trigger(processingTime='5 minutes') \
-    .start()
-query.awaitTermination()
-query.stop()
-spark.stop()
+# spark.sparkContext.setLogLevel("WARN")
+# query = combined_and_events_query \
+#     .coalesce(1) \
+#     .writeStream \
+#     .format("parquet") \
+#     .option("path", "/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs") \
+#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
+#     .trigger(processingTime='5 minutes') \
+#     .start()
+# query.awaitTermination()
+# query.stop()
+# spark.stop()
 
 
 
@@ -250,16 +252,16 @@ spark.stop()
 
 
 
-#
-# spark.sparkContext.setLogLevel("WARN")
-# query = combined_and_events_query \
-#     .writeStream \
-#     .format("console") \
-#     .outputMode("append") \
-#     .start()
-# query.awaitTermination()
-# query.stop()
-# spark.stop()
+
+spark.sparkContext.setLogLevel("WARN")
+query = combined_and_events_query \
+    .writeStream \
+    .format("console") \
+    .outputMode("append") \
+    .start()
+query.awaitTermination()
+query.stop()
+spark.stop()
 
 
 

@@ -8,7 +8,7 @@ new_topic = Topic('listen-events', 9092)
 spark = SparkSession.builder \
     .appName("data_prep") \
     .getOrCreate()
-df = spark.read.parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/part-00000-0b43a732-25f7-45b9-8b24-ba8788682f52-c000.snappy.parquet')
+df = spark.read.parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/part-00000-eacaca76-0c15-4fd1-a0d7-9daf8a0012d8-c000.snappy.parquet')
 pdf = df.toPandas()
 
 

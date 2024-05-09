@@ -1,63 +1,36 @@
-import os
 from sklearn.metrics.pairwise import cosine_similarity
 from pyspark.sql import SparkSession
 import pandas as pd
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, DoubleType
-from pyspark.sql.functions import col, from_json
-import featuretools as ft
-# pip3 install --upgrade setuptools     in order to use featuretools
 from topics import Topic
 
 
 new_topic = Topic('listen-events', 9092)
-
-
 spark = SparkSession.builder \
     .appName("data_prep") \
     .getOrCreate()
-
-schema = StructType([
-    StructField("artist", StringType(), True),
-    StructField("song", StringType(), True),
-    StructField("duration", DoubleType(), True),
-    StructField("ts", LongType(), True),
-    StructField("sessionId", IntegerType(), True),
-    StructField("userId", IntegerType(), True),
-    StructField("city", StringType(), True),
-    StructField("state", StringType(), True),
-    StructField("zip", StringType(), True),
-    StructField("lon", DoubleType(), True),
-    StructField("lat", DoubleType(), True),
-    StructField("userAgent", StringType(), True),
-    StructField("level", StringType(), True),
-    StructField("registration", LongType(), True),
-])
-
-
-df = spark.read.parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/part-00000-ee141df1-dbf0-4181-a697-697b88930d22-c000.snappy.parquet')
-
-# df.createOrReplaceTempView("events")
-#
-# spark.sql("""
-#     SELECT *
-#     FROM events
-# """).show()
-
-
+df = spark.read.parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/part-00000-0b43a732-25f7-45b9-8b24-ba8788682f52-c000.snappy.parquet')
 pdf = df.toPandas()
+
+
 # create user-item interaction matrix by getting the total amount of times a user
 # has interacted with a song( implying that they like it)
 # group that count by each user = pdf.groupby(['userId', 'song']) then .size() to get group of the userId with the size/count of the song
 # users will be the rows and songs will be the columns
 # achieve this with the unstack method that pivots the table while replacing any null values with zero
-
 user_item_matrix = pdf.groupby(['userId', 'song']).size().unstack(fill_value=0)
+
+
 
 # use the cosine similarity formula to find the similarities between users
 # formula (A * B) / ||A|| * ||B||
 # Using cosine similarity identifies other users who have similar listening patterns
-#
 cosine_sim = cosine_similarity(user_item_matrix)
+
+
+# then we put the users into a user_similarity_matrix to cut down on the computational cost
+# Precomputing and storing the similarities between users in a matrix makes it faster to generate recommendations
+# storing the cosine similar users also allows us to use index-Based of similar users for any given user...
+# rather than doing the math for every time we target a new user for recommendations.
 user_similarity_matrix = pd.DataFrame(cosine_sim, index=user_item_matrix.index, columns=user_item_matrix.index)
 
 def recommend_songs(user_id, user_similarity_matrix, user_item_matrix):
@@ -91,23 +64,6 @@ def recommend_songs(user_id, user_similarity_matrix, user_item_matrix):
     return recommendations
 
 
-user_id = 11
+user_id = 300
 recommendations = recommend_songs(user_id, user_similarity_matrix, user_item_matrix)
 print(f"Top recommended songs for user {user_id} are:\n{recommendations}")
-
-
-
-
-
-
-
-# Prepare data for Featuretools
-# entity_set = ft.EntitySet(id='to_features')
-# entity_set = entity_set.add_dataframe(
-#     dataframe_name='events',
-#     dataframe=pdf,
-#     index='index'
-# )
-
-# feature_matrix, feature_defs = ft.dfs(entityset=entity_set, target_dataframe_name='events', max_depth=2)
-# print(feature_matrix.head())

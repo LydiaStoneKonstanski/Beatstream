@@ -118,14 +118,14 @@ df3 = spark \
 #
 # parsed_df = df.withColumn("data", from_json(col("value"), schema))
 # found a way to use the SQL commands we all know and love
-df = df.withColumn("event_time", current_timestamp())
-df = df.withWatermark("event_time", "10 minutes")
-
-df2 = df2.withColumn("event_time", current_timestamp())
-df2 = df2.withWatermark("event_time", "10 minutes")
-
-df3 = df3.withColumn("event_time", current_timestamp())
-df3 = df3.withWatermark("event_time", "10 minutes")
+# df = df.withColumn("event_time", current_timestamp())
+# df = df.withWatermark("event_time", "10 minutes")
+#
+# df2 = df2.withColumn("event_time", current_timestamp())
+# df2 = df2.withWatermark("event_time", "10 minutes")
+#
+# df3 = df3.withColumn("event_time", current_timestamp())
+# df3 = df3.withWatermark("event_time", "10 minutes")
 
 
 
@@ -211,7 +211,7 @@ cleaned_details AS (
 ),
 cleaned_events AS (
     SELECT
-        song, ts, city, zip, state, userId, gender, duration,
+        song, FROM_UNIXTIME(ts) date, city, zip, state, userId, gender, duration,
         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS cleaned_artist
     FROM events
 )
@@ -224,19 +224,18 @@ JOIN cleaned_details cd ON ct.track_id = cd.cleaned_track_id
 """)
 
 
-
-
-
-# query = combined_and_events_query \
-#     .coalesce(4) \
-#     .writeStream \
-#     .format("parquet") \
-#     .option("path", "/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs") \
-#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
-#     .trigger(processingTime='2 minutes') \
-#     .start()
-# query.awaitTermination()
-
+spark.sparkContext.setLogLevel("WARN")
+query = combined_and_events_query \
+    .coalesce(1) \
+    .writeStream \
+    .format("parquet") \
+    .option("path", "/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs") \
+    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/spark_utils/spark-warehouse") \
+    .trigger(processingTime='5 minutes') \
+    .start()
+query.awaitTermination()
+query.stop()
+spark.stop()
 
 
 
@@ -251,16 +250,16 @@ JOIN cleaned_details cd ON ct.track_id = cd.cleaned_track_id
 
 
 
-
-spark.sparkContext.setLogLevel("WARN")
-query = combined_and_events_query \
-    .writeStream \
-    .format("console") \
-    .outputMode("append") \
-    .start()
-query.awaitTermination()
-query.stop()
-spark.stop()
+#
+# spark.sparkContext.setLogLevel("WARN")
+# query = combined_and_events_query \
+#     .writeStream \
+#     .format("console") \
+#     .outputMode("append") \
+#     .start()
+# query.awaitTermination()
+# query.stop()
+# spark.stop()
 
 
 

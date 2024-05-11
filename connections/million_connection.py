@@ -1,11 +1,14 @@
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, DECIMAL, create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.sql import func
+from sqlalchemy.orm import load_only
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 import os
 import math
 import pandas as pd
+import random
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -155,6 +158,9 @@ class MillionConnection():
 
 
     def get_year(self, track_id):
+        if track_id is None:
+            return None
+
         # SQLAlchemy:
         #track = self.session.query(Track).filter(Track.track_id == track_id).first()
         #year = track.year
@@ -168,6 +174,8 @@ class MillionConnection():
         return year
 
     def get_artist_id(self, track_id):
+        if track_id is None:
+            return None
         # SQLAlchemy:
         # track = self.session.query(Track).filter(Track.track_id == track_id).first()
         # artist_id = track.artist_id
@@ -182,20 +190,47 @@ class MillionConnection():
 
     def get_similar_artist_ids(self, artist_id):
         artist_ids = []
-        similar_match = self.session.query(Similarity).filter(Similarity.similar == artist_id).all()
+        similar_match = self.session.query(Similarity).filter(Similarity.similar == artist_id).with_entities(Similarity.target).all()
 
         for artist in similar_match:
-            artist_ids.append(artist.target)
+            artist_ids.append(artist[0])
 
-        target_match = self.session.query(Similarity).filter(Similarity.target == artist_id).all()
+        target_match = self.session.query(Similarity).filter(Similarity.target == artist_id).with_entities(Similarity.similar).all()
 
         for artist in target_match:
-            artist_ids.append(artist.similar)
+            artist_ids.append(artist[0])
 
         return artist_ids
 
     def get_decade(self, year):
         return math.floor(year / 10) * 10
+
+    def get_random_track_id(self):
+        #track_id = self.tracks_df.sample(n=1).track_id.values[0]
+        index = random.randint(1, 1000000)
+        track_id = self.session.query(Track).filter(Track.index == index).with_entities(Track.track_id).first()[0]
+        return track_id
+
+    def get_same_artist_track_id(self, current_track_id):
+        if current_track_id is None:
+            return self.get_random_track_id()
+        artist_id = self.get_artist_id(current_track_id)
+        tracks = self.session.query(Track).filter(Track.artist_id == artist_id).with_entities(Track.track_id).all()
+        random_choice = random.randint(0, len(tracks) - 1)
+        track = tracks[random_choice]
+        return track[0]
+
+    def get_same_decade_track_id(self, current_track_id):
+        if current_track_id is None:
+            return self.get_random_track_id()
+        year = self.get_year(current_track_id)
+        if year == 0:
+            return self.get_random_track_id()
+        decade = self.get_decade(year)
+        tracks = self.session.query(Track).filter(Track.year >= decade, Track.year < decade + 10).with_entities(Track.track_id).all()
+        random_choice = random.randint(0, len(tracks) - 1)
+        track = tracks[random_choice]
+        return track[0]
 
 
 if __name__ == "__main__":

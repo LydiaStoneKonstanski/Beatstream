@@ -1,9 +1,9 @@
 # BeatStream: A Musically-Focused Data Pipeline
 
 ### ABOUT: 
-Welcome to BeatStream! This project is a comprehensive data pipeline designed for predictive modeling, real-time analysis of music data, and interactive visualization. Whether you're a music enthusiast, a data scientist, or someone intrigued by the intersection of music and technology, BeatStream offers an exciting platform to explore. 
-By leveraging advanced predictive modeling techniques and real-time data analysis, BeatStream offers personalized song recommendations tailored to individual user preferences.
-BeatStream recommends the next song based on the user's current track and selected predictive models. These models are chosen specifically for each user, enhancing the accuracy and relevance of recommendations.
+<p>Welcome to BeatStream! This project is a comprehensive data pipeline designed for predictive modeling, real-time analysis of music data, and interactive visualization.<br> Whether you're a music enthusiast, a data scientist, or someone intrigued by the intersection of music and technology, BeatStream offers an exciting platform to explore.<br> 
+By leveraging advanced predictive modeling techniques and real-time data analysis, BeatStream offers personalized song recommendations tailored to individual user preferences.<br>
+BeatStream recommends the next song based on the user's current track and selected predictive models. These models are chosen specifically for each user, enhancing the accuracy and relevance of recommendations.<br>
 ### TECH STACK:
 BeatStream is built on the following technologies:
 -Python 3

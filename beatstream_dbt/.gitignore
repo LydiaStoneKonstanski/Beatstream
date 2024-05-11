@@ -3,3 +3,4 @@ models
 target/
 dbt_packages/
 logs/
+gcloud_key

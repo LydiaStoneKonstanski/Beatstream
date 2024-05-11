@@ -1,5 +1,4 @@
 bigquery_exttables
-models
 target/
 dbt_packages/
 logs/

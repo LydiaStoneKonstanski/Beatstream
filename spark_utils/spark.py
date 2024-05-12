@@ -24,52 +24,31 @@ new_topic = Topic('listen-events', 9092)
 # 1.2 GB or 1200MB
 # each partition will handle about 6 MB
 
+# .config("spark.dynamicAllocation.enabled", "true") \
+#     .config("spark.dynamicAllocation.minExecutors", "1") \
+#     .config("spark.dynamicAllocation.maxExecutors", "25") \
+#     .config("spark.executor.extraJavaOptions", "-XX:+UseG1GC") \
+#     .config("spark.driver.extraJavaOptions", "-XX:+UseG1GC") \
+
 spark = SparkSession.builder \
     .appName("beat_streamer") \
-    .config("spark.executor.memory", "6g") \
-    .config("spark.driver.memory", '6g') \
-    .config("spark.executor.cores", "7") \
-    .config("spark.kafka.consumer.poll.ms", "1000") \
-    .config("spark.kafka.consumer.pool.size.max", "100") \
-    .config("spark.sql.shuffle.partitions", "100") \
-    .config("spark.dynamicAllocation.enabled", "true") \
-    .config("spark.dynamicAllocation.minExecutors", "1") \
-    .config("spark.dynamicAllocation.maxExecutors", "25") \
-    .config("spark.executor.extraJavaOptions", "-XX:+UseG1GC") \
-    .config("spark.driver.extraJavaOptions", "-XX:+UseG1GC") \
+    .config("spark.executor.memory", "4g") \
+    .config("spark.driver.memory", '4g') \
+    .config("spark.executor.cores", "1") \
+    .config("spark.sql.shuffle.partitions", "50") \
     .getOrCreate()
 
 
 # create your schema based on the keys in the json
 # much like how we create schema in sqlalchemy
 schema1 = StructType([
-    StructField("artist", StringType(), True),
-    StructField("song", StringType(), True),
     StructField("ts", LongType(), True),
     StructField("city", StringType(), True),
     StructField("zip", StringType(), True),
     StructField("state", StringType(), True),
     StructField("userId", IntegerType(), True),
-    StructField("duration", DoubleType(), True),
-    StructField("gender", StringType(), True),
-    StructField("lastname", StringType(), True),
-    StructField("firstname", StringType(), True)
 ])
 
-
-schema2 = StructType([
-    StructField("track_id", StringType(), True),
-    StructField("time_signature", StringType(), True),
-    StructField("tempo", StringType(), True),
-    StructField("loudness", StringType(), True),
-])
-
-
-schema3 = StructType([
-    StructField("track_id", StringType(), True),
-    StructField("artist_name", StringType(), True),
-    StructField("artist_id", StringType(), True)
-])
 
 # below is the spark equivalent of a consumer
 # the max offsets determines how much of the data will be received per stream
@@ -82,33 +61,65 @@ df = spark \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", f"{new_topic.topic}") \
     .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 10000) \
+    .option("maxOffsetsPerTrigger", 4000) \
     .load() \
     .select(from_json(col("value").cast("string"), schema1).alias("data")) \
     .select("data.*")
 
-df2 = spark \
-    .readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
-    .option("subscribe", "analysis") \
-    .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 10000) \
-    .load() \
-    .select(from_json(col("value").cast("string"), schema2).alias("data2")) \
-    .select("data2.*")
+
+# spark.sparkContext.setLogLevel("WARN")
+# query = df \
+#     .coalesce(1) \
+#     .writeStream \
+#     .format("parquet") \
+#     .trigger(processingTime="1 minute")\
+#     .trigger(once=True) \
+#     .option("path", "/Users/chris/pyprojects/Beatstream/data/users") \
+#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/users-warehouse") \
+#     .start()
+spark.sparkContext.setLogLevel("WARN")
+query = df \
+    .coalesce(1) \
+    .writeStream \
+    .format("parquet") \
+    .option("path", "/Users/chris/pyprojects/Beatstream/data/users") \
+    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/users-warehouse") \
+    .trigger(processingTime="1 minute") \
+    .outputMode("append") \
+    .start()
+
+query.awaitTermination()
+query.stop()
+spark.stop()
 
 
-df3 = spark \
-    .readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
-    .option("subscribe", "tracks") \
-    .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 10000) \
-    .load() \
-    .select(from_json(col("value").cast("string"), schema3).alias("data3")) \
-    .select("data3.*")
+
+query.awaitTermination()
+query.stop()
+spark.stop()
+
+# df2 = spark \
+#     .readStream \
+#     .format("kafka") \
+#     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
+#     .option("subscribe", "analysis") \
+#     .option("startingOffsets", "earliest") \
+#     .option("maxOffsetsPerTrigger", 10000) \
+#     .load() \
+#     .select(from_json(col("value").cast("string"), schema2).alias("data2")) \
+#     .select("data2.*")
+#
+#
+# df3 = spark \
+#     .readStream \
+#     .format("kafka") \
+#     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
+#     .option("subscribe", "tracks") \
+#     .option("startingOffsets", "earliest") \
+#     .option("maxOffsetsPerTrigger", 10000) \
+#     .load() \
+#     .select(from_json(col("value").cast("string"), schema3).alias("data3")) \
+#     .select("data3.*")
 
 # df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
 # # parse the json and use the schema
@@ -127,12 +138,12 @@ df3 = spark \
 
 
 
-df2 = df2.withColumnRenamed('artist_name', 'artist')
-df3 = df3.withColumnRenamed('artist_name', 'artist')
+# df2 = df2.withColumnRenamed('artist_name', 'artist')
+# df3 = df3.withColumnRenamed('artist_name', 'artist')
 
-df.createOrReplaceTempView("events")
-df2.createOrReplaceTempView("tracks_details")
-df3.createOrReplaceTempView("tracks_artists")
+# df.createOrReplaceTempView("events")
+# df2.createOrReplaceTempView("tracks_details")
+# df3.createOrReplaceTempView("tracks_artists")
 
 
 # tracks = spark.sql("""
@@ -193,54 +204,54 @@ df3.createOrReplaceTempView("tracks_artists")
 
 
 
-combined_and_events_query = spark.sql("""
-WITH cleaned_tracks AS (
-    SELECT
-        regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
-        regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id,
-        regexp_replace(artist_id, "^b\\\\'|'$", '') AS cleaned_artist_id
-    FROM tracks_artists
-),
-cleaned_details AS (
-    SELECT
-        time_signature, tempo, loudness,
-        regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
-    FROM tracks_details
-),
-cleaned_events AS (
-    SELECT
-        song, FROM_UNIXTIME(ts) date, city, zip, state, userId, gender, duration, firstname, lastname,
-        regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS cleaned_artist
-    FROM events
-)
-SELECT
-    e.song, e.date, e.city, e.zip, e.state, e.userId, e.gender, e.duration, e.firstname, e.lastname,
-    e.cleaned_artist artist, cd.time_signature, cd.tempo, cd.loudness, ct.cleaned_artist_id artist_id, ct.track_id
-FROM cleaned_events e
-JOIN cleaned_tracks ct ON e.cleaned_artist = ct.artist
-JOIN cleaned_details cd ON ct.track_id = cd.cleaned_track_id
-""")
-
-
-combined_and_events_query.createOrReplaceTempView('combined')
-
-
-user = spark.sql("""
-    SELECT userId userID, firstname, lastname
-    FROM combined
-""")
-
-
-artist = spark.sql("""
-    SELECT artist_id artistID, artist
-    FROM combined
-""")
-
-
-song = spark.sql("""
-    SELECT track_id songID, song, tempo, time_signature, loudness, artist_id
-    FROM combined
-""")
+# combined_and_events_query = spark.sql("""
+# WITH cleaned_tracks AS (
+#     SELECT
+#         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS artist,
+#         regexp_replace(track_id, "^b\\\\'|'$", '') AS track_id,
+#         regexp_replace(artist_id, "^b\\\\'|'$", '') AS cleaned_artist_id
+#     FROM tracks_artists
+# ),
+# cleaned_details AS (
+#     SELECT
+#         time_signature, tempo, loudness,
+#         regexp_replace(track_id, "^b\\\\'|'$", '') AS cleaned_track_id
+#     FROM tracks_details
+# ),
+# cleaned_events AS (
+#     SELECT
+#         song, FROM_UNIXTIME(ts) date, city, zip, state, userId, gender, duration, firstname, lastname,
+#         regexp_replace(artist, "^b['\\"]|['\\"]$", '') AS cleaned_artist
+#     FROM events
+# )
+# SELECT
+#     e.song, e.date, e.city, e.zip, e.state, e.userId, e.gender, e.duration, e.firstname, e.lastname,
+#     e.cleaned_artist artist, cd.time_signature, cd.tempo, cd.loudness, ct.cleaned_artist_id artist_id, ct.track_id
+# FROM cleaned_events e
+# JOIN cleaned_tracks ct ON e.cleaned_artist = ct.artist
+# JOIN cleaned_details cd ON ct.track_id = cd.cleaned_track_id
+# """)
+#
+#
+# combined_and_events_query.createOrReplaceTempView('combined')
+#
+#
+# user = spark.sql("""
+#     SELECT userId userID, firstname, lastname
+#     FROM combined
+# """)
+#
+#
+# artist = spark.sql("""
+#     SELECT artist_id artistID, artist
+#     FROM combined
+# """)
+#
+#
+# song = spark.sql("""
+#     SELECT track_id songID, song, tempo, time_signature, loudness, artist_id
+#     FROM combined
+# """)
 
 # event = spark.sql("""
 #     SELECT date, state, city, zip, track_id song_id, userId user_id
@@ -250,32 +261,32 @@ song = spark.sql("""
 
 
 
-spark.sparkContext.setLogLevel("WARN")
-query1 = user \
-    .coalesce(1) \
-    .writeStream \
-    .format("parquet") \
-    .option("path", "/Users/chris/pyprojects/Beatstream/data/users") \
-    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/users-warehouse") \
-    .start()
-
-spark.sparkContext.setLogLevel("WARN")
-query2 = artist \
-    .coalesce(1) \
-    .writeStream \
-    .format("parquet") \
-    .option("path", "/Users/chris/pyprojects/Beatstream/data/artists") \
-    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/artists-warehouse") \
-    .start()
-
-spark.sparkContext.setLogLevel("WARN")
-query3 = song \
-    .coalesce(1) \
-    .writeStream \
-    .format("parquet") \
-    .option("path", "/Users/chris/pyprojects/Beatstream/data/songs") \
-    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/songs-warehouse") \
-    .start()
+# spark.sparkContext.setLogLevel("WARN")
+# query1 = user \
+#     .coalesce(1) \
+#     .writeStream \
+#     .format("parquet") \
+#     .option("path", "/Users/chris/pyprojects/Beatstream/data/users") \
+#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/users-warehouse") \
+#     .start()
+#
+# spark.sparkContext.setLogLevel("WARN")
+# query2 = artist \
+#     .coalesce(1) \
+#     .writeStream \
+#     .format("parquet") \
+#     .option("path", "/Users/chris/pyprojects/Beatstream/data/artists") \
+#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/artists-warehouse") \
+#     .start()
+#
+# spark.sparkContext.setLogLevel("WARN")
+# query3 = song \
+#     .coalesce(1) \
+#     .writeStream \
+#     .format("parquet") \
+#     .option("path", "/Users/chris/pyprojects/Beatstream/data/songs") \
+#     .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/songs-warehouse") \
+#     .start()
 
 # spark.sparkContext.setLogLevel("WARN")
 # query4 = event \
@@ -290,16 +301,19 @@ query3 = song \
 
 
 
-
-query1.awaitTermination()
-query2.awaitTermination()
-query3.awaitTermination()
+#
+# query.awaitTermination()
+# query.stop()
+# spark.stop()
+#query.awaitTermination()
+# query2.awaitTermination()
+# query3.awaitTermination()
 # query4.awaitTermination()
-query1.stop()
-query2.stop()
-query3.stop()
+# query1.stop()
+# query2.stop()
+# query3.stop()
 # query4.stop()
-spark.stop()
+# spark.stop()
 
 
 

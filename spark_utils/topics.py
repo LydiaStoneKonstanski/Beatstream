@@ -1,5 +1,5 @@
 import os
-from time import sleep
+import pandas as pd
 import logging
 import csv
 from json import dumps, loads
@@ -59,6 +59,25 @@ class Topic:
 
         producer.flush()
         producer.close()
+
+
+    def p_produce(self):
+        producer = KafkaProducer(bootstrap_servers=f'localhost:{self.port}',
+                                 value_serializer=lambda x: dumps(x).encode('utf-8'),
+                                 linger_ms=10)
+
+        df = pd.read_parquet(self.file)
+
+        for index, row in df.iterrows():
+            c_data = row.to_dict()
+            producer.send(topic=self.topic, value=c_data) \
+                    .add_callback(self.on_send_success) \
+                    .add_errback(self.on_send_error)
+
+        producer.flush()
+        producer.close()
+
+
 
     def create(self, topic, port):
         try:

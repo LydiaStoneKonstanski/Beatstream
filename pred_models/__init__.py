@@ -5,6 +5,11 @@ from google.cloud import storage, bigquery
 from google.oauth2 import service_account
 from google.auth import impersonated_credentials, default
 
+import logging
+logger = logging.getLogger(__name__, )
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logger.setLevel(level=logging.DEBUG)
+
 # Set the environment variable to the path of your service account key file
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/lydia/Projects/Beatstream/data/key.json"
 
@@ -13,9 +18,9 @@ variable_value = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
 # Check if the environment variable exists and print its value
 if variable_value:
-    print(f"The value of ENV_VARIABLE_NAME is: {variable_value}")
+    logger.debug(f"The value of ENV_VARIABLE_NAME is: {variable_value}")
 else:
-    print("The environment variable is not set.")
+    logger.debug("The environment variable is not set.")
 
 creds, pid = default()  # takes the credentials from the key file specified by GOOGLE_APPLICATION_CREDENTIAL var
 
@@ -42,7 +47,7 @@ def upload_file_to_gcs(local_file_path, bucket_name, destination_blob_name):
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(local_file_path)
-    print(f"File {local_file_path} uploaded to gs://{bucket_name}/{destination_blob_name}")
+    logger.debug(f"File {local_file_path} uploaded to gs://{bucket_name}/{destination_blob_name}")
 
 
 ## Function to load parquet file
@@ -52,7 +57,7 @@ def upload_file_to_gcs(local_file_path, bucket_name, destination_blob_name):
 # target_schema = target Schema definition - optional
 # bq_client is the globally defined Big_Query Client object using GC credentials
 def load_parquet_bq(source_gcs_uri, target_table_id, write_disposition='TRUNCATE', target_schema=None):
-    print("Write disposition : {}".format(write_disposition))
+    logger.debug("Write disposition : {}".format(write_disposition))
     bq_client = bigquery.Client()
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.PARQUET,
@@ -75,7 +80,7 @@ def load_parquet_bq(source_gcs_uri, target_table_id, write_disposition='TRUNCATE
     job_result = load_job.result()  # Waits for the job to complete.
 
     destination_table = bq_client.get_table(target_table_id)
-    print("Loaded {} rows into table {}.".format(destination_table.num_rows, target_table_id))
+    logger.info("Loaded {} rows into table {}.".format(destination_table.num_rows, target_table_id))
     # Check if the job completed successfully
     if job_result.state == 'DONE':
         return True

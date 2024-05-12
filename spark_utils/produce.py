@@ -3,6 +3,6 @@ listen = Topic('listen-events', 9092, '/Users/lydia/Projects/Beatstream/data/sam
 analysis = Topic('analysis', 9092, '/Users/lydia/Projects/Beatstream/data/analysis.csv')
 tracks = Topic('tracks', 9092, '/Users/lydia/Projects/Beatstream/data/tracks.csv')
 
-listen.p_produce()
+# listen.j_produce()
 # analysis.c_produce()
-# tracks.c_produce()
+tracks.c_produce()

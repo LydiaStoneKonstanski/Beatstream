@@ -15,10 +15,12 @@ pandas==2.2.2
 python-dateutil==2.9.0.post0
 pytz==2024.1
 six==1.16.0
-SQLAlchemy==2.0.29
+SQLAlchemy~=1.4.52
 typing_extensions==4.11.0
 tzdata==2024.1
 Werkzeug==3.0.2
 dbt-bigquery
 pyspark==3.5.1
 fastparquet
+
+scikit-learn~=1.4.2

@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: dbt_pk
+    database: dbt-demo-422300
+    schema: dbt_pk
+    tables:
+      - name: event
+        identifier: updated_event__stage
+      - name: user
+        identifier: user_stage
+      - name: artist
+        identifier: artist_stage
+      - name: song
+        identifier: updated_song_stage
+

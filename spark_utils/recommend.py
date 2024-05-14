@@ -1,7 +1,7 @@
 from sklearn.metrics.pairwise import cosine_similarity
 from pyspark.sql import SparkSession
 import pandas as pd
-#from topics import Topic
+from topics import Topic
 
 
 # new_topic = Topic('listen-events', 9092)
@@ -9,8 +9,8 @@ import pandas as pd
 #     .appName("data_prep") \
 #     .getOrCreate()
 
-#df = spark.read.parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/part-00000-eacaca76-0c15-4fd1-a0d7-9daf8a0012d8-c000.snappy.parquet')
-# pdf = df.toPandas()
+pdf = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/streaming_events_5_12_24.parquet')
+#pdf = df.toPandas()
 
 
 # create user-item interaction matrix by getting the total amount of times a user
@@ -18,7 +18,7 @@ import pandas as pd
 # group that count by each user = pdf.groupby(['userId', 'song']) then .size() to get group of the userId with the size/count of the song
 # users will be the rows and songs will be the columns
 # achieve this with the unstack method that pivots the table while replacing any null values with zero
-user_item_matrix = pdf.groupby(['userId', 'song']).size().unstack(fill_value=0)
+user_item_matrix = pdf.groupby(['userId', 'song_id']).size().unstack(fill_value=0)
 
 
 
@@ -59,12 +59,12 @@ def recommend_songs(user_id, user_similarity_matrix, user_item_matrix):
     known_interactions = user_item_matrix.loc[user_id]
     weighted_scores = weighted_scores[known_interactions == 0]
 
-    # Get the top song recommendations
-    recommendations = weighted_scores.sort_values(ascending=False).head(1)
+    # Get the top 10 song recommendations!
+    recommendations = weighted_scores.sort_values(ascending=False).head(10)
 
     return recommendations
 
 
-user_id = 300
+user_id = 2
 recommendations = recommend_songs(user_id, user_similarity_matrix, user_item_matrix)
 print(f"Top recommended songs for user {user_id} are:\n{recommendations}")

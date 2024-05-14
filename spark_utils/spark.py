@@ -42,11 +42,14 @@ spark = SparkSession.builder \
 # create your schema based on the keys in the json
 # much like how we create schema in sqlalchemy
 schema1 = StructType([
+    StructField('event_id', IntegerType(),False),
     StructField("ts", LongType(), True),
     StructField("city", StringType(), True),
     StructField("zip", StringType(), True),
     StructField("state", StringType(), True),
     StructField("userId", IntegerType(), True),
+    StructField("artist_id", IntegerType(), True),
+    StructField("song_id", IntegerType(), True)
 ])
 
 
@@ -93,10 +96,6 @@ query.stop()
 spark.stop()
 
 
-
-query.awaitTermination()
-query.stop()
-spark.stop()
 
 # df2 = spark \
 #     .readStream \

@@ -1,8 +1,5 @@
 from topics import Topic
-listen = Topic('listen-events', 9092, '/Users/lydia/Projects/Beatstream/data/sample/listen_events')
-analysis = Topic('analysis', 9092, '/Users/lydia/Projects/Beatstream/data/analysis.csv')
-tracks = Topic('tracks', 9092, '/Users/lydia/Projects/Beatstream/data/tracks.csv')
-
-# listen.j_produce()
-# analysis.c_produce()
+listen = Topic('listen-events', 9092, '/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/indexed_streaming_events.parquet')
+# analysis = Topic('analysis', 9092, '/Users/chris/Downloads/mill_songs/analysis copy.csv')
+# tracks = Topic('tracks', 9092, '/Users/chris/Downloads/mill_songs/tracks copy.csv')
 tracks.c_produce()

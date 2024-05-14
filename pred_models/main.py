@@ -1,15 +1,13 @@
 import logging
-import time
 
-import pandas as pd
 from pred_models import logger, bq_client, upload_file_to_gcs, load_parquet_bq
+from google.cloud import bigquery
 import os
 from time import sleep
 from enum import Enum
 from random import randrange
 import cProfile
 import pstats
-from datetime import datetime
 
 
 class Disposition(Enum):
@@ -37,64 +35,37 @@ def upload_df_to_cloud(df, table_name, write_disposition):
     logger.info(f"Load to cloud complete: {table_name}")
 
 
-def run_model_a(static, events, disposition):
+def run_models(static, events, disposition):
     """
     Choose a completely random song from the song table.
     """
-    table_name = 'model_a'
+    table_name = 'model_recommendations'
 
-    logger.debug(f'Starting {table_name}')
     df = events.event_df.copy()
 
-    df['rec_song_id'] = df['song_id'].apply(lambda x: get_random_song(static, x))
-    df = df.drop(['artist_id', 'song_id'], axis=1)
+    description = "Choose a completely random song from the song table."
+    logger.debug(f'Making Model A recommendations: {description}')
+    df['model_a_song_id'] = df['song_id'].apply(lambda x: get_random_song(static, x))
 
-    upload_df_to_cloud(df, table_name, disposition)
-    return df
+    description = "Choose a song with the same artist."
+    logger.debug(f'Making Model B recommendations: {description}')
+    df['model_b_song_id'] = df['song_id'].apply(lambda x: get_song_same_artist(static, x))
 
-def run_model_b(static, events, disposition):
-    """
-    Choose a song with the same artist.
-    """
-    table_name = 'model_b'
+    description = """
+        Choose a song with an artist who is described being similar to the current artist.
+        If the artist does not have similar artists defined, recommend a song by the same artist.
+        """
+    logger.debug(f'Making Model C recommendations: {description}')
+    df['model_c_song_id'] = df['song_id'].apply(lambda x: get_song_similar_artist(static, x))
 
-    logger.debug(f'Starting {table_name}')
-    df = events.event_df.copy()
+    # These model results look too similar to Model B
+    # description = """
+    #         Choose a song with an artist who is described using the same genre as the current artist.
+    #         If the artist does not have a genre, recommend a song by the same artist.
+    #     """
+    # logger.debug(f'Making Model D recommendations: {description}')
+    # df['model_d_song_id'] = df['song_id'].apply(lambda x: get_song_same_genre(static, x))
 
-    df['rec_song_id'] = df['song_id'].apply(lambda x: get_song_same_artist(static, x))
-    df = df.drop(['artist_id', 'song_id'], axis=1)
-
-    upload_df_to_cloud(df, table_name, disposition)
-    return df
-
-
-def run_model_c(static, events, disposition):
-    """
-    Choose a song with an artist who is described being similar to the current artist.
-    If the artist does not have similar artists defined, recommend a song by the same artist.
-    """
-    table_name = 'model_c'
-
-    logger.debug(f'Starting {table_name}')
-    df = events.event_df.copy()
-
-    df['rec_song_id'] = df['song_id'].apply(lambda x: get_song_similar_artist(static, x))
-    df = df.drop(['artist_id', 'song_id'], axis=1)
-
-    upload_df_to_cloud(df, table_name, disposition)
-    return df
-
-def run_model_d(static, events, disposition):
-    """
-    Choose a song with an artist who is described using the same genre as the current artist.
-    If the artist does not have a genre, recommend a song by the same artist.
-    """
-    table_name = 'model_d'
-
-    logger.debug(f'Starting {table_name}')
-    df = events.event_df.copy()
-
-    df['rec_song_id'] = df['song_id'].apply(lambda x: get_song_same_genre(static, x))
     df = df.drop(['artist_id', 'song_id'], axis=1)
 
     upload_df_to_cloud(df, table_name, disposition)
@@ -135,47 +106,6 @@ def get_song_same_genre(static, song_id):
     songs = static.same_artist_lookup[artist]
     return songs[randrange(0, len(songs))]
 
-
-def score_model(model_df, static, events, table_name, disposition):
-    logger.info(f'Computing score for {table_name}')
-    df = model_df.copy()
-
-    # Splitting into smaller tables for performance
-    user_events_dfs = {}
-    for userId in static.users:
-        user_events_dfs[userId] = events.event_df[events.event_df['userId'] == userId]
-
-    df['score'] = df.apply(lambda x: get_score(x['ts'], x['rec_song_id'], user_events_dfs[x['userId']]), axis=1)
-    df = df.drop(['rec_song_id'], axis=1)
-    upload_df_to_cloud(df, table_name, disposition)
-
-    logger.debug(f'Computing cumulative score for {table_name}')
-    df['date'] = df.apply(lambda x: get_date_from_ts(x['ts']), axis=1)
-    cumulative_df = df.groupby(['date'], as_index=False).sum()
-
-    cumulative_df = cumulative_df.drop(['userId', 'ts'], axis=1)
-    cumulative_df['cumulative_score'] = cumulative_df.apply(lambda x: get_cumulative_score(x['date'], cumulative_df), axis=1)
-    cumulative_df['ts'] = cumulative_df.apply(lambda x: get_ts_from_date(x['date']), axis=1)
-    cumulative_df = cumulative_df.drop(['date'], axis=1)
-    upload_df_to_cloud(cumulative_df, table_name + '_cumulative', disposition)
-
-def get_score(ts, song_id, df):
-    """
-    A recommendation gets one point for each time the user plays the song after the recommendation is made.
-    This means the earlier you can find the user's new favorite song, the higher score you get.
-    """
-    score = len(df[(df['song_id'] == song_id) & (df['ts'] > ts)])
-    return score
-
-def get_cumulative_score(date, df):
-    cumulative_score = df[(df['date'] <= date)]['score'].sum()
-    return cumulative_score
-
-def get_date_from_ts(ts):
-    return datetime.fromtimestamp(ts / 1000.0).date()
-
-def get_ts_from_date(date):
-    return time.mktime(date.timetuple()) * 1000
 
 class StaticData():
     def __init__(self):
@@ -239,19 +169,24 @@ class StaticData():
         #     else:
         #         self.artist_genres[artist_id].append(genre)
 
-        logger.debug('Importing users')
-        query = """ select userId from dbt_pk.user """
-        self.users = bq_client.query(query).to_dataframe()['userId'].tolist()
-
 
 class EventData():
     def __init__(self):
         self.event_df = None
 
-    def get_data(self):
+    def get_data(self, last_event_id):
         logger.info('Importing events')
-        query = """ SELECT userId, ts, song_id, artist_id FROM dbt_pk.static_events_5_12_24 """
-        self.event_df = bq_client.query(query).to_dataframe()
+        self.event_df = None
+        query = f""" SELECT event_id, userId, ts, song_id, artist_id 
+                    FROM dbt_pk.event 
+                    WHERE event_id > @last_event_id
+                """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("last_event_id", "INT64", last_event_id),
+            ]
+        )
+        self.event_df = bq_client.query(query, job_config=job_config).to_dataframe()
         logger.debug(f'Imported {len(self.event_df)} events')
 
 
@@ -261,26 +196,23 @@ def main():
     logger.info('Starting PredictiveModels')
     static = StaticData()
     events = EventData()
+
+    # The first iteration will start from scratch, and clear out any previous recommendations
     disposition = Disposition.TRUNCATE
+    last_event_id = -1
 
     while True:
-        events.get_data()
+        events.get_data(last_event_id)
+        if len(events.event_df) > 0:
+            last_event_id = int(events.event_df['event_id'].max())
+            run_models(static, events, disposition)
 
-        model_df = run_model_a(static, events, disposition)
-        score_model(model_df, static, events, 'model_a_score', disposition)
-
-        model_df = run_model_b(static, events, disposition)
-        score_model(model_df, static, events, 'model_b_score', disposition)
-
-        model_df = run_model_c(static, events, disposition)
-        score_model(model_df, static, events, 'model_c_score', disposition)
-
-        # model_df = run_model_d(static, events, disposition)
-        # score_model(model_df, static, events, 'model_d_score', disposition)
-
-        logger.info("Completed model runs. Waiting for new data...")
-        break
-        sleep(60)
+            # All further iterations will append new event recommendations
+            disposition = Disposition.APPEND
+            logger.info("Completed model runs. Waiting for new data...")
+        else:
+            logger.info("No new events. Waiting for new data...")
+        sleep(10)
 
 if __name__ == "__main__":
     profile = False

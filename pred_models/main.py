@@ -17,7 +17,6 @@ class Disposition(Enum):
     APPEND = 2
 
 
-
 def upload_df_to_cloud(df, table_name, write_disposition):
     data_folder = '../data/pred_models'
     bucket_name = 'dbtdemo'
@@ -47,7 +46,7 @@ def run_model_a(static, events, disposition):
     logger.debug(f'Starting {table_name}')
     df = events.event_df.copy()
 
-    df['rec_song_id'] = df['song_id'].apply(lambda a: get_random_song(static, a))
+    df['rec_song_id'] = df['song_id'].apply(lambda x: get_random_song(static, x))
     df = df.drop(['artist_id', 'song_id'], axis=1)
 
     upload_df_to_cloud(df, table_name, disposition)
@@ -62,7 +61,7 @@ def run_model_b(static, events, disposition):
     logger.debug(f'Starting {table_name}')
     df = events.event_df.copy()
 
-    df['rec_song_id'] = df['song_id'].apply(lambda a: get_song_same_artist(static, a))
+    df['rec_song_id'] = df['song_id'].apply(lambda x: get_song_same_artist(static, x))
     df = df.drop(['artist_id', 'song_id'], axis=1)
 
     upload_df_to_cloud(df, table_name, disposition)
@@ -79,7 +78,7 @@ def run_model_c(static, events, disposition):
     logger.debug(f'Starting {table_name}')
     df = events.event_df.copy()
 
-    df['rec_song_id'] = df['song_id'].apply(lambda a: get_song_similar_artist(static, a))
+    df['rec_song_id'] = df['song_id'].apply(lambda x: get_song_similar_artist(static, x))
     df = df.drop(['artist_id', 'song_id'], axis=1)
 
     upload_df_to_cloud(df, table_name, disposition)
@@ -95,7 +94,7 @@ def run_model_d(static, events, disposition):
     logger.debug(f'Starting {table_name}')
     df = events.event_df.copy()
 
-    df['rec_song_id'] = df['song_id'].apply(lambda a: get_song_same_genre(static, a))
+    df['rec_song_id'] = df['song_id'].apply(lambda x: get_song_same_genre(static, x))
     df = df.drop(['artist_id', 'song_id'], axis=1)
 
     upload_df_to_cloud(df, table_name, disposition)
@@ -111,6 +110,18 @@ def get_song_same_artist(static, song_id):
     songs = static.same_artist_lookup[artist_id]
     return songs[randrange(0, len(songs))]
 
+def get_song_similar_artist(static, song_id):
+    artist_id = static.artist_lookup[song_id]
+    try:
+        artists = static.similar_lookup[artist_id]
+    except KeyError:
+        # Not all artist have genre tags defined. Pick a random song from same artist
+        return get_song_same_artist(static, song_id)
+    artist = artists[randrange(0, len(artists))]
+    songs = static.same_artist_lookup[artist]
+    return songs[randrange(0, len(songs))]
+
+
 def get_song_same_genre(static, song_id):
     artist_id = static.artist_lookup[song_id]
     try:
@@ -120,17 +131,6 @@ def get_song_same_genre(static, song_id):
         return get_song_same_artist(static, song_id)
     genre = genres[randrange(0, len(genres))]
     artists = static.genre_lookup[genre]
-    artist = artists[randrange(0, len(artists))]
-    songs = static.same_artist_lookup[artist]
-    return songs[randrange(0, len(songs))]
-
-def get_song_similar_artist(static, song_id):
-    artist_id = static.artist_lookup[song_id]
-    try:
-        artists = static.similar_lookup[artist_id]
-    except KeyError:
-        # Not all artist have genre tags defined. Pick a random song from same artist
-        return get_song_same_artist(static, song_id)
     artist = artists[randrange(0, len(artists))]
     songs = static.same_artist_lookup[artist]
     return songs[randrange(0, len(songs))]
@@ -182,12 +182,12 @@ class StaticData():
         logger.info('Importing static data')
 
         logger.debug('Importing songs')
-        query = """ SELECT song_id, artist_id, year FROM dbt_pk.song"""
+        query = """ SELECT song_id, artist_id FROM dbt_pk.song"""
         self.song_df = bq_client.query(query).to_dataframe()
 
         logger.debug('Importing artist songs')
-        self.artist_lookup = {}
-        self.same_artist_lookup = {}
+        self.artist_lookup = {} # given song_id, find artist_id
+        self.same_artist_lookup = {} # given artist_id, find list of all their song_ids
         for index, row in self.song_df.iterrows():
             song_id = row.song_id
             artist_id = row.artist_id
@@ -198,23 +198,15 @@ class StaticData():
             self.artist_lookup[song_id] = artist_id
 
         logger.debug('Importing similarity')
-        # TODO: This query is slow, probably because it is connecting to raw table.
-        # Migrate to similarity table once exists
         query = """ SELECT target, similar FROM dbt_pk.similarity 
                     WHERE target IN (SELECT DISTINCT(artist_id) FROM dbt_pk.event)
                     AND similar IN (SELECT DISTINCT(artist_id) FROM dbt_pk.event) """
         similar_df = bq_client.query(query).to_dataframe()
         logger.debug(f'{len(similar_df)} rows.')
-        #similar_df = similar_df[similar_df['target'] in self.artist_lookup.keys() & similar_df['similar'] in self.artist_lookup.keys()]
-        #logger.debug(f'{len(similar_df)} rows.')
-        self.similar_lookup = {}
+        self.similar_lookup = {} # given artist_id, find list of all similar artist_ids
         for index, row in similar_df.iterrows():
             target = row.target
             similar = row.similar
-            # if target not in self.artist_lookup.keys():
-            #     continue
-            # if similar not in self.artist_lookup.keys():
-            #     continue
             if target not in self.similar_lookup:
                 self.similar_lookup[target] = [similar]
             else:
@@ -227,31 +219,29 @@ class StaticData():
         for key, value in self.similar_lookup.items():
             self.similar_lookup[key] = list(set(value))
 
-        logger.debug('Importing mbtags')
-        query = """ SELECT artist_id, mbtag FROM dbt_pk.artist_mbtag """
-        mbtag_df = bq_client.query(query).to_dataframe()
-        self.genre_lookup = {}
-        self.artist_genres = {}
-        for index, row in mbtag_df.iterrows():
-            genre = row.mbtag
-            artist_id = row.artist_id
-            if artist_id not in self.artist_lookup.keys():
-                continue
-            if genre not in self.genre_lookup:
-                self.genre_lookup[genre] = [artist_id]
-            else:
-                self.genre_lookup[genre].append(artist_id)
-            if artist_id not in self.artist_genres:
-                self.artist_genres[artist_id] = [genre]
-            else:
-                self.artist_genres[artist_id].append(genre)
+        # THIS CODE USED FOR MODEL D WHICH IS CURRENTLY INACTIVE
+        # logger.debug('Importing mbtags')
+        # query = """ SELECT artist_id, mbtag FROM dbt_pk.artist_mbtag """
+        # mbtag_df = bq_client.query(query).to_dataframe()
+        # self.genre_lookup = {} # given genre (mbtag), find list of all artist who use that genre
+        # self.artist_genres = {} # given artist_id, find list of all genres that artist uses
+        # for index, row in mbtag_df.iterrows():
+        #     genre = row.mbtag
+        #     artist_id = row.artist_id
+        #     if artist_id not in self.artist_lookup.keys():
+        #         continue
+        #     if genre not in self.genre_lookup:
+        #         self.genre_lookup[genre] = [artist_id]
+        #     else:
+        #         self.genre_lookup[genre].append(artist_id)
+        #     if artist_id not in self.artist_genres:
+        #         self.artist_genres[artist_id] = [genre]
+        #     else:
+        #         self.artist_genres[artist_id].append(genre)
 
         logger.debug('Importing users')
         query = """ select userId from dbt_pk.user """
         self.users = bq_client.query(query).to_dataframe()['userId'].tolist()
-
-        # logger.info(
-        #     f'Loaded {len(self.song_df)} songs, {len(similar_df)} artist similarities, and {len(mbtag_df)} genre tags.')
 
 
 class EventData():

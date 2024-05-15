@@ -47,7 +47,7 @@ spark = SparkSession.builder \
 # much like how we create schema in sqlalchemy
 schema1 = StructType([
     StructField('event_id', IntegerType(),False),
-    StructField("ts", LongType(), True),
+    StructField("ts", IntegerType(), True),
     StructField("city", StringType(), True),
     StructField("zip", StringType(), True),
     StructField("state", StringType(), True),
@@ -68,7 +68,7 @@ df = spark \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", f"{new_topic.topic}") \
     .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 4000) \
+    .option("maxOffsetsPerTrigger", 40000) \
     .load() \
     .select(from_json(col("value").cast("string"), schema1).alias("data")) \
     .select("data.*")

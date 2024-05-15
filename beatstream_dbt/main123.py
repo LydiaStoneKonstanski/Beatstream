@@ -6,8 +6,7 @@ from google.oauth2 import service_account
 from google.auth import impersonated_credentials, default
 
 # Set the environment variable to the path of your service account key file
-os.environ[
-    "GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/deepa/Documents/Projects/Beatstream/beatstream_dbt/gcloud_key/dbt-demo-422300-f22c1de9a426.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/deepa/Documents/Projects/Beatstream/beatstream_dbt/gcloud_key/dbt-demo-422300-f22c1de9a426.json"
 
 # the code below up to if else is just to check if the env var is set up correctly
 variable_value = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
@@ -18,14 +17,22 @@ if variable_value:
 else:
     print("The environment variable is not set.")
 
+
+
+credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+if os.path.exists(credentials_path):
+    print(f"The credentials file exists at: {credentials_path}")
+else:
+    print(f"The credentials file does NOT exist at: {credentials_path}")
+
 creds, pid = default()  # takes the credentials from the key file specified by GOOGLE_APPLICATION_CREDENTIAL var
 
 # Set up impersonated credentials for the service account
 impersonated_account_email = "dbtservacct@dbt-demo-422300.iam.gserviceaccount.com"
 
 myimpersonated_credentials = impersonated_credentials.Credentials(
-    source_credentials=creds,
-    target_principal=impersonated_account_email,
+    source_credentials=creds,   #the credentials of the service account or user running the script.
+    target_principal=impersonated_account_email,   #
     target_scopes=["https://www.googleapis.com/auth/cloud-platform"]
 )
 
@@ -75,6 +82,7 @@ def load_parquet_bq(source_gcs_uri, target_table_id, write_disposition='TRUNCATE
 
     job_result = load_job.result()  # Waits for the job to complete.
 
+    #retrieving and printing the number of rows loaded
     destination_table = bq_client.get_table(target_table_id)
     print("Loaded {} rows into table {}.".format(destination_table.num_rows, target_table_id))
     # Check if the job completed successfully

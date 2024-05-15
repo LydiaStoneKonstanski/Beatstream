@@ -3,8 +3,8 @@ import pandas as pd
 import logging
 import csv
 from json import dumps, loads
-from kafka import KafkaProducer
-from kafka.common import TopicAlreadyExistsError
+# from kafka import KafkaProducer
+# from kafka.common import TopicAlreadyExistsError
 
 
 

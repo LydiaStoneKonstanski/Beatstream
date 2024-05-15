@@ -2,7 +2,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, DoubleType
 from pyspark.sql.functions import col, from_json
 from topics import Topic
-
 # this line of code is how we deploy are spark app
 # spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 spark.py
 
@@ -38,7 +37,7 @@ spark = SparkSession.builder \
     .appName("beat_streamer") \
     .config("spark.executor.memory", "4g") \
     .config("spark.driver.memory", '4g') \
-    .config("spark.executor.cores", "1") \
+    .config("spark.executor.cores", "4") \
     .config("spark.sql.shuffle.partitions", "100") \
     .getOrCreate()
 
@@ -47,13 +46,13 @@ spark = SparkSession.builder \
 # much like how we create schema in sqlalchemy
 schema1 = StructType([
     StructField('event_id', IntegerType(),False),
-    StructField("ts", LongType(), True),
+    StructField("ts", IntegerType(), True),
     StructField("city", StringType(), True),
-    StructField("zip", StringType(), True),
+    StructField("zip", IntegerType(), True),
     StructField("state", StringType(), True),
     StructField("userId", IntegerType(), True),
-    StructField("artist_id", IntegerType(), True),
-    StructField("song_id", IntegerType(), True)
+    StructField("artist_id", StringType(), True),
+    StructField("song_id", StringType(), True)
 ])
 
 
@@ -68,7 +67,7 @@ df = spark \
     .option("kafka.bootstrap.servers", f"localhost:{new_topic.port}") \
     .option("subscribe", f"{new_topic.topic}") \
     .option("startingOffsets", "earliest") \
-    .option("maxOffsetsPerTrigger", 4000) \
+    .option("maxOffsetsPerTrigger", 40000) \
     .load() \
     .select(from_json(col("value").cast("string"), schema1).alias("data")) \
     .select("data.*")
@@ -89,8 +88,8 @@ query = df \
     .coalesce(1) \
     .writeStream \
     .format("parquet") \
-    .option("path", "/Users/chris/pyprojects/Beatstream/data/users") \
-    .option("checkpointLocation", "/Users/chris/pyprojects/Beatstream/data/users-warehouse") \
+    .option("path", "/Users/deepa/Documents/Projects/Beatstream/data/events") \
+    .option("checkpointLocation", "/Users/deepa/Documents/Projects/Beatstream/data/events-warehouse") \
     .trigger(processingTime="1 minute") \
     .outputMode("append") \
     .start()

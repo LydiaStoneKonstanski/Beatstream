@@ -1,4 +1,7 @@
 from rec_models import bq_client, upload_file_to_gcs, load_parquet_bq
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import numpy as np
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, DoubleType
 from pyspark.sql.functions import col, from_json, current_timestamp
@@ -142,16 +145,23 @@ if __name__ == "__main__":
     table_name = 'rec_model'
     table_description = """
     """
-    query = """ SELECT userId, song_id, DATE(TIMESTAMP_MILLIS(ts)) ts FROM dbt_pk.static_events_5_12_24"""
-    pdf2 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/7k_user_event test.parquet')
+    query = """ SELECT userId, song_id, DATE(TIMESTAMP_MILLIS(ts)) ts FROM dbt_pk.event"""
+    # pdf2 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/7k_user_event test.parquet')
     whole_set = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/indexed_full_events.parquet')
-    pdf = bq_client.query(query).to_dataframe()
-    dropped_df = pdf.drop_duplicates(subset=["userId"], keep=False)
-    latest_timestamps = dropped_df.groupby('userId')['ts'].agg('max').reset_index()
-    user_list_with_timestamps = list(zip(latest_timestamps['userId'], latest_timestamps['ts']))
-    # user_list = dropped_df['userId'].tolist()
+    batch_1 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch1.parquet')
+    batch_2 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch2.parquet')
+    batch_3 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch3.parquet')
+    # batch_4 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch4.parquet')
+    # batch_5 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch5.parquet')
+    batch_6 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch6.parquet')
+    batch_7 = pd.read_parquet('/Users/chris/pyprojects/Beatstream/spark_utils/new_parqs/stream_batch7.parquet')
 
-    user_item_matrix = pdf.groupby(['userId', 'song_id']).size().unstack(fill_value=0)
+    static = bq_client.query(query).to_dataframe()
+    dropped_df = static.drop_duplicates(subset=["userId"], keep='first')
+    user_list_with_timestamps = list(zip(dropped_df['userId'], dropped_df['ts']))
+    user_list = dropped_df['userId'].tolist()
+
+    user_item_matrix = static.groupby(['userId', 'song_id']).size().unstack(fill_value=0)
 
     cosine_sim = cosine_similarity(user_item_matrix)
 
@@ -183,9 +193,10 @@ if __name__ == "__main__":
         weighted_scores = weighted_scores[known_interactions == 0]
 
         # Get the top song recommendations
-        recommendation = weighted_scores.sort_values(ascending=False).head(10)
+        rec = weighted_scores.sort_values(ascending=False).head(10)
 
-        return recommendation
+        return rec
+
 
     users = []
     songs = []
@@ -194,39 +205,176 @@ if __name__ == "__main__":
     for user, ts in user_list_with_timestamps:
         recommendations = recommend_songs(user, user_similarity_matrix, user_item_matrix)
         # print(f"Top recommended song for user {user_id} is:\n{recommendations} at {ts}")
+        # for a list of their top ten songs.append(str(recommendations).split()[1:-2:2])
         users.append(user)
         songs.append(str(recommendations).split()[1:-2:2])
         stamps.append(ts)
+
+    rec_dict = {'userId': users, 'song_id': songs, 'ts': stamps}
+
+    rec_df = pd.DataFrame(rec_dict)
+
+    # Initialize a list to store cumulative matches
+    cumulative_matches = []
+    accurate_song = []
+    time_stamp = []
+    target_user = []
+    # Track cumulative matches
+    cumulative_score = 0
+    batch_1 = batch_1.sort_values('ts', ascending=True)
+    for idx, row in batch_2.iterrows():
+        # Extract current record recommendations for the user
+        current_rec = rec_df[rec_df['userId'] == row['userId']]
+        # Get list of recommended song_ids for this user
+        recommended_songs = current_rec['song_id'].explode().unique()
+
+        # Check if the current row's song_id is within the recommended songs
+        if row['song_id'] in recommended_songs:
+            # Append the current cumulative score to the list
+            cumulative_score += 1
+
+        time_stamp.append(row['ts'])
+        target_user.append(row['userId'])
+        accurate_song.append(row['song_id'])
+        cumulative_matches.append(cumulative_score)
+    print(cumulative_matches)
+
+    cumulative_dict = {'ts': time_stamp, 'userId': target_user, 'song_id': accurate_song, 'score': cumulative_matches}
+    cumulative_df = pd.DataFrame(cumulative_dict)
+    # cumulative_df['date'] = pd.to_datetime(cumulative_df['ts'], unit='ms')
+    # max_ts = cumulative_df['ts'].agg('max')
+    # max_date = pd.to_datetime(max_ts, unit='ms')
+    # min_ts = cumulative_df['ts'].agg('min')
+    # min_date = pd.to_datetime(min_ts, unit='ms')
+    # print(f"\n\n\n\n\n\n\n{min_date} to {max_date}")
+    model_a = PredictiveModel(table_name, table_description, cumulative_df)
+    model_a.upload_df_to_cloud(Disposition.TRUNCATE)
+
+
+
+
+
+
+    # Plotting the cumulative matches
+    # plt.figure(figsize=(10, 5))
+    # plt.plot(cumulative_matches, label='Cumulative Matches')
+    # plt.xlabel('Number of Events Processed')
+    # plt.ylabel('Cumulative Matches')
+    # plt.title('Cumulative Matches Over Events')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+
+    # Make sure that both your current_batch and rec_df(recommendations DataFrame) are
+    # uploaded to BigQuery.You can use the BigQuery webUI,
+    # command line, or anyclient libraries for this.
+
+
+
+
+
+#     WITH
+#     MatchedSongs
+#     AS(
+#         SELECT
+#     c.userId,
+#     c.song_id,
+#     IF(c.song_id = ANY(r.recommended_songs), 1, 0) AS
+#     match
+#     FROM
+#     current_batch
+#     c
+#     JOIN
+#     rec_df
+#     r
+#     ON
+#     c.userId = r.userId
+#     )
+#
+#     SELECT
+#     userId,
+#     song_id,
+#     SUM(match)
+#     OVER(ORDER
+#     BY
+#     TIMESTAMP_FIELD
+#     ROWS
+#     BETWEEN
+#     UNBOUNDED
+#     PRECEDING
+#     AND
+#     CURRENT
+#     ROW) AS
+#     cumulative_matches
+# FROM
+# MatchedSongs
+
+
+
+
+
+
+
+
+
+
+
+
+    # pdf['recommended_song'] = None
+    # for index, row in pdf.iterrows():
+    #     # pdf['recommended_song'] = rec row['userId']
+    #
+        # recommendation = recommend_songs(user_id, user_similarity_matrix, user_item_matrix)
+        # print(f"Top recommended songs for user {user_id} is:\n{recommendation}")
+
 
     # max_ts = pdf['ts'].agg('max')
     # max_date = pd.to_datetime(max_ts, unit='ms')
     # min_ts = pdf['ts'].agg('min')
     # min_date = pd.to_datetime(min_ts, unit='ms')
     # print(f"\n\n\n\n\n\n\n{min_date} to {max_date}")
-    # rec_dict = {'userId': users, 'song_id': songs, 'ts': stamps}
-    # persisted = pd.DataFrame(rec_dict)
+    #rec_dict = {'userId': users, 'song_id': songs, 'ts': stamps}
 
 
 
-    score_dict = {}
+    # score_dict = {}
+    #
+    # # # Loop over each user and their respective timestamp and recommendation list
+    # for user, ts, recommended_songs in zip(users, stamps, songs):
+    #     # Subset the PDF dataframe to only include the current user's data
+    #     target_user = current_batch[current_batch['userId'] == user]
+    # # Calculate the score for the current user by counting how many recommended songs appear in their historical interactions
+    #     score = sum(target_user['song_id'].isin(recommended_songs))
+    #     score2 = []
+    #     play_count = 0
+    #     for song in recommended_songs:
+    #         print(len(target_user[target_user['song_id'] == song]))
+    #     #     print(score2)
+    #     # Store the score in the dictionary using the user ID as the key
+    #     score_dict[user] = score
+    #     # print(len(target_user))
+    # # Print the score dictionary to check the scores for each user
+    # print(score_dict)
 
-    # Loop over each user and their respective timestamp and recommendation list
-    for user, ts, recommended_songs in zip(users, stamps, songs):
-        # Subset the PDF dataframe to only include the current user's data
-        target_user = whole_set[whole_set['userId'] == user]
 
-        # Calculate the score for the current user by counting how many recommended songs appear in their historical interactions
-        score = sum(target_user['song_id'].isin(recommended_songs))
-        score2 = []
-        play_count = 0
-        # for song in recommended_songs:
-        #     score2.append(len(target_user[target_user['song_id'] == song]))
-        #     print(score2)
-        # Store the score in the dictionary using the user ID as the key
-        score_dict[user] = score, (len(target_user))
-        print(len(target_user))
-    # Print the score dictionary to check the scores for each user
-    print(score_dict)
+    # count = 0
+    # ########
+    # matches = 0
+    # total = len(current_batch)
+    # # each event score
+    # for idx, row in current_batch.iterrows():
+    #     current_rec = rec_df[rec_df['userId'] == row['userId']]
+    #     if row['song_id'] in str(current_rec['song_id'].str[:]):
+    #         matches += 1
+    #         print(matches)
+            #print(f'{row}\n{rec_df[rec_df['userId'] == row['userId']]}')
+
+        #print(current_rec['song_id'].str[:])
+
+
+
+
+
     #print(pdf.size)
     # print(len(users))
     #print(songs)
@@ -295,3 +443,9 @@ if __name__ == "__main__":
     # # rec_df = pd.DataFrame(rec_dict)
     # # model_a = PredictiveModel(table_name, table_description, rec_df)
     # # model_a.upload_df_to_cloud(Disposition.TRUNCATE)
+
+
+
+
+
+

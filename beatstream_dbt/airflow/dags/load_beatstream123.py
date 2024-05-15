@@ -27,7 +27,7 @@ dag = DAG(
 load_tables_cmd  = 'echo "Start executing airflow DAG ro laod Beastream data batch" >> ~/beatstream_20220511.log;python3 ~/Documents/Projects/beatstream/beatstream_dbt/main123.py'
 
 # Command to run DBT
-run_dbt_cmd = "dbt run --project-dir  /Users/deepa/Documents/Projects/Beatstream/beatstream_dbt --profiles-dir /Users/deepa/Documents/Projects/Beatstream/beatstream_dbt"
+run_dbt_cmd = "dbt run --project-dir  /Users/chris/pyprojects/Beatstream/beatstream_dbt --profiles-dir /Users/chris/pyprojects/Beatstream/beatstream_dbt"
 #run_dbt_cmd = 'sleep 30;echo "Complete executing airflow DAG ro laod Beastream data batch" >> ~/beatstream_dbt_20220511.log'
 
 # Task to call main.py script for table loads

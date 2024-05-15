@@ -5,12 +5,13 @@ sources:
     database: dbt-demo-422300
     schema: dbt_pk
     tables:
-      - name: event
-        identifier: updated_event__stage
+      - name: rec
+        identifier: rec_model
       - name: user
         identifier: user_stage
       - name: artist
         identifier: artist_stage
       - name: song
         identifier: updated_song_stage
-
+      - name: event
+        identifier: event

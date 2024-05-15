@@ -1,28 +1,32 @@
-import os
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, DoubleType
-from pyspark.sql.functions import col, from_json, current_timestamp
+from pyspark.sql.functions import col, from_json
 from topics import Topic
 
 # this line of code is how we deploy are spark app
 # spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 spark.py
 
-
+# this is where we instansiate our topic from which we'll receive our user events
 new_topic = Topic('listen-events', 9092)
 
 
 # a lot like flask. this is where are app is created when we run the program
 
-# allocate 2GB of memory for each execution to make sure the app doesn't fail
-# while processing 1.2GB of data
 
-# assign 2 cores to the app allowing us to run up to 2 tasks at a time
+# allocate 2GB of memory for each execution to make sure the app doesn't fail
+# while processing 1.2GB of data. this effictively  for memory spikes during our tasks
+
+
+# assign 1 core to the app allowing us to run our task
+# and enable us to store the events into a single file
 
 
 # determines the amount of spark partitions to use (the defualt is 200)
+# hwo
+
 # 1.2 million rows of 1 kb rows
 # 1.2 GB or 1200MB
-# each partition will handle about 6 MB
+# each partition will handle about 12 MB
 
 # .config("spark.dynamicAllocation.enabled", "true") \
 #     .config("spark.dynamicAllocation.minExecutors", "1") \
@@ -35,7 +39,7 @@ spark = SparkSession.builder \
     .config("spark.executor.memory", "4g") \
     .config("spark.driver.memory", '4g') \
     .config("spark.executor.cores", "1") \
-    .config("spark.sql.shuffle.partitions", "50") \
+    .config("spark.sql.shuffle.partitions", "100") \
     .getOrCreate()
 
 

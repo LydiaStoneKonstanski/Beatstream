@@ -2,6 +2,7 @@
           unique_key=['userId', 'song_id', 'ts']) }}
 
     select
+	event_id as event_id,
 	ts as ts,
 	state as state,
 	city as city,
